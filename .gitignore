@@ -1,0 +1,11 @@
+.ipynb_checkpoints
+.DS_Store
+data/.DS_Store
+machine-learning/.DS_Store
+
+*.tsv
+*.xlsx
+*.json
+
+machine-learning/learn
+machine-learning/model
