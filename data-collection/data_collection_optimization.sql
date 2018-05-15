@@ -6,7 +6,7 @@
 DROP TABLE sup_stats
 DROP TABLE org_stats
 DROP TABLE okpd_stats
-DROP TABLE ter_stats
+--DROP TABLE ter_stats
 DROP TABLE okpd_sup_stats
 DROP TABLE sup_org_stats
 
@@ -55,12 +55,12 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='okpd_stats' AND xtype='U')
   )
 
 --Создание таблицы для хранения статистики по территории
-IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='ter_stats' AND xtype='U')
-  CREATE TABLE guest.ter_stats (
-    TerrID INT NOT NULL PRIMARY KEY,
-    cntr_num INT,
-    good_cntr_num INT
-  )
+--IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='ter_stats' AND xtype='U')
+--  CREATE TABLE guest.ter_stats (
+--    TerrID INT NOT NULL PRIMARY KEY,
+--    cntr_num INT,
+--    good_cntr_num INT
+--  )
 
 --Создание таблицы для хранения статистики по ОКПД и поставщику
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='okpd_sup_stats' AND xtype='U')
@@ -148,17 +148,17 @@ WHERE t.code = okpd_stats.code
 
 GO
 --Заполнение таблицы со статистикой по территориям
-INSERT INTO ter_stats 
-SELECT 
-t.Code1,
-guest.ter_num_of_contracts(t.Code1),
-guest.ter_num_of_good_contracts(t.Code1)
-FROM
-(
-  SELECT DISTINCT
-  ter.Code1
-  FROM DV.d_Territory_RF AS ter
-)t
+--INSERT INTO ter_stats 
+--SELECT 
+--t.Code1,
+--guest.ter_num_of_contracts(t.Code1),
+--guest.ter_num_of_good_contracts(t.Code1)
+--FROM
+--(
+--  SELECT DISTINCT
+--  ter.Code1
+--  FROM DV.d_Territory_RF AS ter
+--)t
 
 GO
 -- Заполнение таблицы okpd_sup_stats

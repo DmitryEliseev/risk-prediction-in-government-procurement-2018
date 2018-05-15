@@ -5,7 +5,7 @@
 GO
 SELECT TOP(100)
 cntr.ID AS 'cntrID',
-ROUND(1.0 * guest.ter_stats.good_cntr_num / guest.ter_stats.cntr_num, 3) AS 'ter_good_cntr_share',
+--ROUND(1.0 * guest.ter_stats.good_cntr_num / guest.ter_stats.cntr_num, 3) AS 'ter_good_cntr_share',
 
 guest.sup_stats.sup_cntr_num,
 guest.sup_stats.sup_running_cntr_num,
