@@ -3,11 +3,12 @@
 */
 
 GO
-SELECT DISTINCT
+SELECT TOP(100)
 cntr.ID AS 'cntrID',
 ROUND(1.0 * guest.ter_stats.good_cntr_num / guest.ter_stats.cntr_num, 3) AS 'ter_good_cntr_share',
 
 guest.sup_stats.sup_cntr_num,
+guest.sup_stats.sup_running_cntr_num,
 ROUND(1.0 * guest.sup_stats.sup_good_cntr_num / guest.sup_stats.sup_cntr_num, 3) AS 'sup_good_cntr_share',
 ROUND(1.0 * guest.sup_stats.sup_fed_cntr_num / guest.sup_stats.sup_cntr_num, 3) AS 'sup_fed_cntr_share',
 ROUND(1.0 * guest.sup_stats.sup_sub_cntr_num / guest.sup_stats.sup_cntr_num, 3) AS 'sup_sub_cntr_share',
@@ -23,6 +24,7 @@ sup.RefStatusSup AS 'sup_status',
 supType.Code AS 'sup_type',
 
 guest.org_stats.org_cntr_num,
+guest.org_stats.org_running_cntr_num,
 ROUND(1.0 * guest.org_stats.org_good_cntr_num / guest.org_stats.org_cntr_num, 3) AS 'org_good_cntr_share',
 ROUND(1.0 * guest.org_stats.org_fed_cntr_num / guest.org_stats.org_cntr_num, 3) AS 'org_fed_cntr_share',
 ROUND(1.0 * guest.org_stats.org_sub_cntr_num / guest.org_stats.org_cntr_num, 3) AS 'org_sub_cntr_share',
