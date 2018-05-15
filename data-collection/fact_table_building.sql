@@ -37,7 +37,8 @@ guest.sup_org_stats.cntr_num AS 'cntr_num_together',
 orgForm.code AS org_form,
 org.RefTypeOrg AS org_type,
 
-1.0 * guest.okpd_stats.good_cntr_num / guest.okpd_stats.cntr_num AS 'okpd_good_cntr_share',
+guest.okpd_stats.good_cntr_num as 'okpd_good_cntr_num',
+guest.okpd_stats.cntr_num AS 'okpd_cntr_num',
 
 okpd.Code AS okpd, 
 val.Price AS price,
