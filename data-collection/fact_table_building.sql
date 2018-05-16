@@ -1,12 +1,79 @@
 ﻿/*
-Построение выборки
+Построение финальной выборки
 */
 
+--Создание таблицы для хранения выборки
 GO
-SELECT TOP(100)
-cntr.ID AS 'cntrID',
---ROUND(1.0 * guest.ter_stats.good_cntr_num / guest.ter_stats.cntr_num, 3) AS 'ter_good_cntr_share',
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sample' AND xtype='U')
+  CREATE TABLE guest.sample (
+    ID INT NOT NULL IDENTITY(1,1) PRIMARY KEY,
+    valID INT NOT NULL,
+    cntrID INT NOT NULL,
+    supID INT NOT NULL,
+    orgID INT NOT NULL,
+    
+    --Поставщик
+    sup_cntr_num INT,
+    sup_running_cntr_num INT,
+    sup_good_cntr_share FLOAT,
+    sup_fed_cntr_share FLOAT, 
+    sup_sub_cntr_share FLOAT, 
+    sup_mun_cntr_share FLOAT,
+    sup_cntr_avg_price BIGINT,
+    sup_cntr_avg_penalty_share FLOAT,
+    sup_no_pnl_share FLOAT,
+    sup_1s_sev FLOAT,
+    sup_1s_org_sev FLOAT,
+    sup_okpd_cntr_num INT,
+    sup_sim_price_share FLOAT,
+    sup_status INT,
+    sup_type INT,
+    
+    --Заказчик
+    org_cntr_num INT,
+    org_running_cntr_num INT,
+    org_good_cntr_share FLOAT,
+    org_fed_cntr_share FLOAT,
+    org_sub_cntr_share FLOAT,
+    org_mun_cntr_share FLOAT,
+    org_cntr_avg_price BIGINT,
+    org_1s_sev FLOAT,
+    org_1s_sup_sev FLOAT,
+    org_sim_price_share FLOAT,
+    cntr_num_together INT,
+    org_form INT,
+    org_type INT,
+    
+    --ОКПД
+    okpd_cntr_num INT,
+    okpd_good_cntr_num INT,
+    okpd VARCHAR(9),
 
+    --Контракт
+    price BIGINT,
+    pmp BIGINT,
+    cntr_lvl INT,
+    sign_date INT,
+    exec_date INT,
+    purch_type INT,
+    price_higher_pmp BIT,
+    price_too_low BIT,
+
+    --Целевая переменная
+    cntr_result BIT
+
+  )
+
+--Заполнение плохими контрактами
+GO
+INSERT INTO guest.sample
+SELECT
+val.ID, 
+cntr.ID,
+sup.ID,
+org.ID,
+
+--Поставщик
 guest.sup_stats.sup_cntr_num,
 guest.sup_stats.sup_running_cntr_num,
 ROUND(1.0 * guest.sup_stats.sup_good_cntr_num / guest.sup_stats.sup_cntr_num, 3) AS 'sup_good_cntr_share',
@@ -18,11 +85,12 @@ guest.sup_stats.sup_cntr_avg_penalty,
 guest.sup_stats.sup_no_pnl_share,
 guest.sup_stats.sup_1s_sev,
 guest.sup_stats.sup_1s_org_sev,
-guest.okpd_sup_stats.cntr_num / guest.sup_stats.sup_cntr_num AS 'sup_okpd_exp',
+guest.okpd_sup_stats.cntr_num AS 'sup_okpd_cntr_num',
 guest.sup_similar_contracts_by_price_share(sup.ID, val.Price) AS 'sup_sim_price_share',
 sup.RefStatusSup AS 'sup_status',
 supType.Code AS 'sup_type',
 
+--Заказчик
 guest.org_stats.org_cntr_num,
 guest.org_stats.org_running_cntr_num,
 ROUND(1.0 * guest.org_stats.org_good_cntr_num / guest.org_stats.org_cntr_num, 3) AS 'org_good_cntr_share',
@@ -37,21 +105,22 @@ guest.sup_org_stats.cntr_num AS 'cntr_num_together',
 orgForm.code AS org_form,
 org.RefTypeOrg AS org_type,
 
+--ОКПД
 guest.okpd_stats.good_cntr_num as 'okpd_good_cntr_num',
 guest.okpd_stats.cntr_num AS 'okpd_cntr_num',
-
 okpd.Code AS okpd, 
+
+--Контракт
 val.Price AS price,
 val.PMP AS pmp,
-
 val.RefLevelOrder AS cntr_lvl,
 cntr.RefSignDate AS sign_date,
 cntr.RefExecution AS exec_date,
 cntr.RefTypePurch AS purch_type,
-
 CASE WHEN (val.PMP > 0) AND (val.Price > val.PMP) THEN 1 ELSE 0 END AS price_higher_pmp,
 CASE WHEN val.Price <= val.PMP * 0.6 THEN 1 ELSE 0 END AS price_too_low,
 
+--Целевая переменная
 guest.pred_variable(cntr.ID) AS cntr_result
 
 FROM DV.f_OOS_Value AS val
@@ -83,13 +152,18 @@ WHERE
   guest.ter_stats.cntr_num > 0 --Количество контрактов по территории больше 0
   
 
+--Заполнение хорошими контрактами
 GO
---Выбор на 50% больше хороших контрактов
+INSERT INTO guest.sample
 SELECT TOP(CAST(@@ROWCOUNT*1.5 AS INT))
-cntr.ID AS 'cntrID',
-ROUND(1.0 * guest.ter_stats.good_cntr_num / guest.ter_stats.cntr_num, 3) AS 'ter_good_cntr_share',
+val.ID, 
+cntr.ID,
+sup.ID,
+org.ID,
 
+--Поставщик
 guest.sup_stats.sup_cntr_num,
+guest.sup_stats.sup_running_cntr_num,
 ROUND(1.0 * guest.sup_stats.sup_good_cntr_num / guest.sup_stats.sup_cntr_num, 3) AS 'sup_good_cntr_share',
 ROUND(1.0 * guest.sup_stats.sup_fed_cntr_num / guest.sup_stats.sup_cntr_num, 3) AS 'sup_fed_cntr_share',
 ROUND(1.0 * guest.sup_stats.sup_sub_cntr_num / guest.sup_stats.sup_cntr_num, 3) AS 'sup_sub_cntr_share',
@@ -99,12 +173,14 @@ guest.sup_stats.sup_cntr_avg_penalty,
 guest.sup_stats.sup_no_pnl_share,
 guest.sup_stats.sup_1s_sev,
 guest.sup_stats.sup_1s_org_sev,
-guest.okpd_sup_stats.cntr_num / guest.sup_stats.sup_cntr_num AS 'sup_okpd_exp',
+guest.okpd_sup_stats.cntr_num AS 'sup_okpd_cntr_num',
 guest.sup_similar_contracts_by_price_share(sup.ID, val.Price) AS 'sup_sim_price_share',
 sup.RefStatusSup AS 'sup_status',
 supType.Code AS 'sup_type',
 
+--Заказчик
 guest.org_stats.org_cntr_num,
+guest.org_stats.org_running_cntr_num,
 ROUND(1.0 * guest.org_stats.org_good_cntr_num / guest.org_stats.org_cntr_num, 3) AS 'org_good_cntr_share',
 ROUND(1.0 * guest.org_stats.org_fed_cntr_num / guest.org_stats.org_cntr_num, 3) AS 'org_fed_cntr_share',
 ROUND(1.0 * guest.org_stats.org_sub_cntr_num / guest.org_stats.org_cntr_num, 3) AS 'org_sub_cntr_share',
@@ -117,20 +193,22 @@ guest.sup_org_stats.cntr_num AS 'cntr_num_together',
 orgForm.code AS org_form,
 org.RefTypeOrg AS org_type,
 
-1.0 * guest.okpd_stats.good_cntr_num / guest.okpd_stats.cntr_num AS 'okpd_good_cntr_share',
-
+--ОКПД
+guest.okpd_stats.good_cntr_num as 'okpd_good_cntr_num',
+guest.okpd_stats.cntr_num AS 'okpd_cntr_num',
 okpd.Code AS okpd, 
+
+--Контракт
 val.Price AS price,
 val.PMP AS pmp,
-
 val.RefLevelOrder AS cntr_lvl,
 cntr.RefSignDate AS sign_date,
 cntr.RefExecution AS exec_date,
 cntr.RefTypePurch AS purch_type,
-
 CASE WHEN (val.PMP > 0) AND (val.Price > val.PMP) THEN 1 ELSE 0 END AS price_higher_pmp,
 CASE WHEN val.Price <= val.PMP * 0.6 THEN 1 ELSE 0 END AS price_too_low,
 
+--Целевая переменная
 guest.pred_variable(cntr.ID) AS cntr_result
 
 FROM DV.f_OOS_Value AS val
