@@ -136,7 +136,6 @@ INNER JOIN DV.fx_OOS_OrgForm AS orgForm ON orgForm.ID = sup.RefFormOrg
 INNER JOIN guest.sup_stats ON sup.ID = guest.sup_stats.SupID
 INNER JOIN guest.org_stats ON org.ID = guest.org_stats.OrgID
 INNER JOIN guest.okpd_stats ON okpd.Code = guest.okpd_stats.code
-INNER JOIN guest.ter_stats ON ter.Code1 = ter_stats.TerrID
 INNER JOIN guest.okpd_sup_stats ON (okpd_sup_stats.SupID = sup.ID AND okpd_sup_stats.OkpdCode = okpd.Code)
 INNER JOIN guest.sup_org_stats ON (sup_org_stats.SupID = sup.ID AND sup_org_stats.OrgID = org.ID)
 WHERE 
@@ -148,8 +147,7 @@ WHERE
   cntr.RefStage != 2 AND
   cntr.RefSignDate > 20150000 AND --Контракт заключен не ранее 2015 года
   guest.org_stats.org_cntr_num > 0 AND --Количество контрактов у организации больше 0
-  guest.sup_stats.sup_cntr_num > 0 AND --Количество контрактов у поставщика больше 0
-  guest.ter_stats.cntr_num > 0 --Количество контрактов по территории больше 0
+  guest.sup_stats.sup_cntr_num > 0 --Количество контрактов у поставщика больше 0
   
 
 --Заполнение хорошими контрактами
@@ -224,18 +222,14 @@ INNER JOIN DV.fx_OOS_OrgForm AS orgForm ON orgForm.ID = sup.RefFormOrg
 INNER JOIN guest.sup_stats ON sup.ID = guest.sup_stats.SupID
 INNER JOIN guest.org_stats ON org.ID = guest.org_stats.OrgID
 INNER JOIN guest.okpd_stats ON okpd.Code = guest.okpd_stats.code
-INNER JOIN guest.ter_stats ON ter.Code1 = ter_stats.TerrID
 INNER JOIN guest.okpd_sup_stats ON (okpd_sup_stats.SupID = sup.ID AND okpd_sup_stats.OkpdCode = okpd.Code)
 INNER JOIN guest.sup_org_stats ON (sup_org_stats.SupID = sup.ID AND sup_org_stats.OrgID = org.ID)
 WHERE 
   guest.pred_variable(cntr.ID) = 1 AND
   val.Price > 0 AND --Контракт реальный
   cntr.RefTypePurch != 6 AND --Не закупка у единственного поставщика
-  cntr.RefStage != -1 AND --Контракт завершен
-  cntr.RefStage != 1 AND
-  cntr.RefStage != 2 AND
+  cntr.RefStage IN (3, 4) AND --Контракт завершен
   cntr.RefSignDate > 20150000 AND --Контракт заключен не ранее 2015 года
   guest.org_stats.org_cntr_num > 0 AND --Количество контрактов у организации больше 0
-  guest.sup_stats.sup_cntr_num > 0 AND --Количество контрактов у поставщика больше 0
-  guest.ter_stats.cntr_num > 0 --Количество контрактов по территории больше 0
+  guest.sup_stats.sup_cntr_num > 0 --Количество контрактов у поставщика больше 0
 ORDER BY NEWID()
