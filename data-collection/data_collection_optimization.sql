@@ -1,14 +1,14 @@
-﻿/*
+/*
 Предварительный подсчет необходимых для построения целевый выборки метрик 
 и сохранение результатов в промежуточные таблицы
 */
 
-DROP TABLE sup_stats
-DROP TABLE org_stats
-DROP TABLE okpd_stats
---DROP TABLE ter_stats
-DROP TABLE okpd_sup_stats
-DROP TABLE sup_org_stats
+--DROP TABLE sup_stats
+--DROP TABLE org_stats
+--DROP TABLE okpd_stats
+----DROP TABLE ter_stats
+--DROP TABLE okpd_sup_stats
+--DROP TABLE sup_org_stats
 
 GO
 --Создание таблицы для хранения статистики по поставщикам
