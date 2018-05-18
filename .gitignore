@@ -9,4 +9,8 @@ machine-learning/.DS_Store
 
 machine-learning/learn
 machine-learning/model
-machine-learning/legacy
+machine-learning/experiments
+
+web-app/setting.ini
+web-app/.idea
+web-app/__pycache__
