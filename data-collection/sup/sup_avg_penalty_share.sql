@@ -15,11 +15,10 @@ BEGIN
   		FROM DV.f_OOS_Value AS val
       INNER JOIN DV.d_OOS_Suppliers AS sup ON sup.ID = val.RefSupplier    
   		INNER JOIN DV.d_OOS_Contracts AS cntr ON cntr.ID = val.RefContract
-  		INNER JOIN DV.fx_OOS_ContractStage AS cntrSt ON cntrSt.ID = cntr.RefStage
   		INNER JOIN DV.d_OOS_Penalties AS pnl ON pnl.RefContract = cntr.ID
   		WHERE
   			sup.ID = @SupID AND 
-  			cntrSt.ID IN (3, 4) 
+  			cntr.RefStage IN (3, 4)
     )t 
   )
   
@@ -29,5 +28,5 @@ BEGIN
     RETURN 0
   END
   
-  RETURN ROUND(@avg_penalty_share, 5)
+  RETURN ROUND(@avg_penalty_share, 3)
 END

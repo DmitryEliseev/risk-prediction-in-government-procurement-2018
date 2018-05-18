@@ -14,5 +14,5 @@ cd ../ter
 for %%G in (*.sql) do sqlcmd /S %server_name% /d %db_name% -U %username% -P %pwd% -i"%%G"
 
 cd ..
-sqlcmd /S 192.168.42.37 /d %db_name% -U oos_piao -P "dv" -i"pred_variable.sql"
+sqlcmd /S %server_name% /d %db_name% -U %username% -P %pwd% -i"pred_variable.sql"
 pause

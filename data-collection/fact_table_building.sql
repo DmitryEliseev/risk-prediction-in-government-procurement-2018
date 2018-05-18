@@ -26,8 +26,6 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sample' AND xtype='U')
     sup_1s_org_sev FLOAT,
     sup_okpd_cntr_num INT,
     sup_sim_price_share FLOAT,
-    sup_status INT,
-    sup_type INT,
     
     --Заказчик
     org_cntr_num INT,
@@ -41,7 +39,6 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sample' AND xtype='U')
     org_1s_sup_sev FLOAT,
     org_sim_price_share FLOAT,
     cntr_num_together INT,
-    org_form INT,
     org_type INT,
     
     --ОКПД
@@ -70,7 +67,7 @@ INSERT INTO guest.sample
 SELECT
 val.ID, 
 cntr.ID,
-sup.ID,
+val.RefSupplier,
 org.ID,
 
 --Поставщик
@@ -85,10 +82,8 @@ guest.sup_stats.sup_cntr_avg_penalty,
 guest.sup_stats.sup_no_pnl_share,
 guest.sup_stats.sup_1s_sev,
 guest.sup_stats.sup_1s_org_sev,
-guest.okpd_sup_stats.cntr_num AS 'sup_okpd_cntr_num',
-guest.sup_similar_contracts_by_price_share(sup.ID, val.Price) AS 'sup_sim_price_share',
-sup.RefStatusSup AS 'sup_status',
-supType.Code AS 'sup_type',
+NULL, --guest.okpd_sup_stats.cntr_num AS 'sup_okpd_cntr_num',
+guest.sup_similar_contracts_by_price_share(val.RefSupplier, guest.sup_stats.sup_cntr_num, val.Price) AS 'sup_sim_price_share',
 
 --Заказчик
 guest.org_stats.org_cntr_num,
@@ -100,9 +95,8 @@ ROUND(1.0 * guest.org_stats.org_mun_cntr_num / guest.org_stats.org_cntr_num, 3) 
 guest.org_stats.org_cntr_avg_price,
 guest.org_stats.org_1s_sev,
 guest.org_stats.org_1s_sup_sev,
-guest.org_similar_contracts_by_price_share(org.ID, val.Price) AS 'org_sim_price_share',
-guest.sup_org_stats.cntr_num AS 'cntr_num_together',
-orgForm.code AS org_form,
+guest.org_similar_contracts_by_price_share(org.ID, guest.org_stats.org_cntr_num, val.Price) AS 'org_sim_price_share',
+NULL, --guest.sup_org_stats.cntr_num AS 'cntr_num_together',
 org.RefTypeOrg AS org_type,
 
 --ОКПД
@@ -124,31 +118,25 @@ CASE WHEN val.Price <= val.PMP * 0.6 THEN 1 ELSE 0 END AS price_too_low,
 guest.pred_variable(cntr.ID) AS cntr_result
 
 FROM DV.f_OOS_Value AS val
-INNER JOIN DV.d_OOS_Suppliers AS sup ON sup.ID = val.RefSupplier
 INNER JOIN DV.d_OOS_Org AS org ON org.ID = val.RefOrg
 INNER JOIN DV.d_OOS_Contracts AS cntr ON cntr.ID = val.RefContract
-INNER JOIN DV.d_Territory_RF AS ter ON ter.ID = val.RefTerritory
 INNER JOIN DV.f_OOS_Product AS prod ON prod.RefContract = cntr.ID
 INNER JOIN DV.d_OOS_Products AS prods ON prods.ID = prod.RefProduct
 INNER JOIN DV.d_OOS_OKPD2 AS okpd ON okpd.ID = prods.RefOKPD2
-INNER JOIN DV.fx_OOS_PartType AS supType ON supType.ID = sup.RefPartType
-INNER JOIN DV.fx_OOS_OrgForm AS orgForm ON orgForm.ID = sup.RefFormOrg
-INNER JOIN guest.sup_stats ON sup.ID = guest.sup_stats.SupID
+INNER JOIN guest.sup_stats ON val.RefSupplier = guest.sup_stats.SupID
 INNER JOIN guest.org_stats ON org.ID = guest.org_stats.OrgID
-INNER JOIN guest.okpd_stats ON okpd.Code = guest.okpd_stats.code
-INNER JOIN guest.okpd_sup_stats ON (okpd_sup_stats.SupID = sup.ID AND okpd_sup_stats.OkpdCode = okpd.Code)
-INNER JOIN guest.sup_org_stats ON (sup_org_stats.SupID = sup.ID AND sup_org_stats.OrgID = org.ID)
-WHERE 
-  guest.pred_variable(cntr.ID) = 0 AND
+INNER JOIN guest.okpd_stats ON okpd.ID = guest.okpd_stats.OkpdID
+--INNER JOIN guest.okpd_sup_stats ON (okpd_sup_stats.SupID = sup.ID AND okpd_sup_stats.OkpdCode = okpd.Code)
+--INNER JOIN guest.sup_org_stats ON (sup_org_stats.SupID = sup.ID AND sup_org_stats.OrgID = org.ID)
+WHERE
+  val.RefLevelOrder = 1 AND --Контракт федерального уровня
   val.Price > 0 AND --Контракт реальный
   cntr.RefTypePurch != 6 AND --Не закупка у единственного поставщика
-  cntr.RefStage != -1 AND --Контракт завершен
-  cntr.RefStage != 1 AND
-  cntr.RefStage != 2 AND
+  cntr.RefStage IN (3, 4) AND --Контракт завершен
   cntr.RefSignDate > 20150000 AND --Контракт заключен не ранее 2015 года
   guest.org_stats.org_cntr_num > 0 AND --Количество контрактов у организации больше 0
-  guest.sup_stats.sup_cntr_num > 0 --Количество контрактов у поставщика больше 0
-  
+  guest.sup_stats.sup_cntr_num > 0 AND --Количество контрактов у поставщика больше 0
+  guest.pred_variable(cntr.ID) = 0 --Контракт плохой
 
 --Заполнение хорошими контрактами
 GO
@@ -156,7 +144,7 @@ INSERT INTO guest.sample
 SELECT TOP(CAST(@@ROWCOUNT*1.5 AS INT))
 val.ID, 
 cntr.ID,
-sup.ID,
+val.RefSupplier,
 org.ID,
 
 --Поставщик
@@ -171,10 +159,8 @@ guest.sup_stats.sup_cntr_avg_penalty,
 guest.sup_stats.sup_no_pnl_share,
 guest.sup_stats.sup_1s_sev,
 guest.sup_stats.sup_1s_org_sev,
-guest.okpd_sup_stats.cntr_num AS 'sup_okpd_cntr_num',
-guest.sup_similar_contracts_by_price_share(sup.ID, val.Price) AS 'sup_sim_price_share',
-sup.RefStatusSup AS 'sup_status',
-supType.Code AS 'sup_type',
+NULL, --guest.okpd_sup_stats.cntr_num AS 'sup_okpd_cntr_num',
+guest.sup_similar_contracts_by_price_share(val.RefSupplier, guest.sup_stats.sup_cntr_num, val.Price) AS 'sup_sim_price_share',
 
 --Заказчик
 guest.org_stats.org_cntr_num,
@@ -186,9 +172,8 @@ ROUND(1.0 * guest.org_stats.org_mun_cntr_num / guest.org_stats.org_cntr_num, 3) 
 guest.org_stats.org_cntr_avg_price,
 guest.org_stats.org_1s_sev,
 guest.org_stats.org_1s_sup_sev,
-guest.org_similar_contracts_by_price_share(org.ID, val.Price) AS 'org_sim_price_share',
-guest.sup_org_stats.cntr_num AS 'cntr_num_together',
-orgForm.code AS org_form,
+guest.org_similar_contracts_by_price_share(org.ID, guest.org_stats.org_cntr_num, val.Price) AS 'org_sim_price_share',
+NULL, --guest.sup_org_stats.cntr_num AS 'cntr_num_together',
 org.RefTypeOrg AS org_type,
 
 --ОКПД
@@ -210,26 +195,23 @@ CASE WHEN val.Price <= val.PMP * 0.6 THEN 1 ELSE 0 END AS price_too_low,
 guest.pred_variable(cntr.ID) AS cntr_result
 
 FROM DV.f_OOS_Value AS val
-INNER JOIN DV.d_OOS_Suppliers AS sup ON sup.ID = val.RefSupplier
 INNER JOIN DV.d_OOS_Org AS org ON org.ID = val.RefOrg
 INNER JOIN DV.d_OOS_Contracts AS cntr ON cntr.ID = val.RefContract
-INNER JOIN DV.d_Territory_RF AS ter ON ter.ID = val.RefTerritory
 INNER JOIN DV.f_OOS_Product AS prod ON prod.RefContract = cntr.ID
 INNER JOIN DV.d_OOS_Products AS prods ON prods.ID = prod.RefProduct
 INNER JOIN DV.d_OOS_OKPD2 AS okpd ON okpd.ID = prods.RefOKPD2
-INNER JOIN DV.fx_OOS_PartType AS supType ON supType.ID = sup.RefPartType
-INNER JOIN DV.fx_OOS_OrgForm AS orgForm ON orgForm.ID = sup.RefFormOrg
-INNER JOIN guest.sup_stats ON sup.ID = guest.sup_stats.SupID
+INNER JOIN guest.sup_stats ON val.RefSupplier = guest.sup_stats.SupID
 INNER JOIN guest.org_stats ON org.ID = guest.org_stats.OrgID
-INNER JOIN guest.okpd_stats ON okpd.Code = guest.okpd_stats.code
-INNER JOIN guest.okpd_sup_stats ON (okpd_sup_stats.SupID = sup.ID AND okpd_sup_stats.OkpdCode = okpd.Code)
-INNER JOIN guest.sup_org_stats ON (sup_org_stats.SupID = sup.ID AND sup_org_stats.OrgID = org.ID)
-WHERE 
-  guest.pred_variable(cntr.ID) = 1 AND
+INNER JOIN guest.okpd_stats ON okpd.ID = guest.okpd_stats.OkpdID
+--INNER JOIN guest.okpd_sup_stats ON (okpd_sup_stats.SupID = sup.ID AND okpd_sup_stats.OkpdCode = okpd.Code)
+--INNER JOIN guest.sup_org_stats ON (sup_org_stats.SupID = sup.ID AND sup_org_stats.OrgID = org.ID)
+WHERE
+  val.RefLevelOrder = 1 AND --Контракт федерального уровня
   val.Price > 0 AND --Контракт реальный
   cntr.RefTypePurch != 6 AND --Не закупка у единственного поставщика
   cntr.RefStage IN (3, 4) AND --Контракт завершен
   cntr.RefSignDate > 20150000 AND --Контракт заключен не ранее 2015 года
   guest.org_stats.org_cntr_num > 0 AND --Количество контрактов у организации больше 0
-  guest.sup_stats.sup_cntr_num > 0 --Количество контрактов у поставщика больше 0
+  guest.sup_stats.sup_cntr_num > 0 AND --Количество контрактов у поставщика больше 0
+  guest.pred_variable(cntr.ID) = 1 --Контракт хороший
 ORDER BY NEWID()

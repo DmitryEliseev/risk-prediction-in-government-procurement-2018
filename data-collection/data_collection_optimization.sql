@@ -1,4 +1,4 @@
-/*
+﻿/*
 Предварительный подсчет необходимых для построения целевый выборки метрик 
 и сохранение результатов в промежуточные таблицы
 */
@@ -48,7 +48,7 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='org_stats' AND xtype='U')
 --Создание таблицы для хранения статистики по ОКПД
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='okpd_stats' AND xtype='U')
   CREATE TABLE guest.okpd_stats (
-    OkpdID INT NOT NULL IDENTITY(1,1) PRIMARY KEY,
+    OkpdID INT NOT NULL PRIMARY KEY,
     code VARCHAR(9),
     cntr_num INT,
     good_cntr_num INT
@@ -66,9 +66,9 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='okpd_stats' AND xtype='U')
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='okpd_sup_stats' AND xtype='U')
   CREATE TABLE guest.okpd_sup_stats (
     SupID INT NOT NULL,
-    OkpdCode INT NOT NULL,
+    OkpdID INT NOT NULL,
     cntr_num INT,
-    PRIMARY KEY (SupID, OkpdCode)
+    PRIMARY KEY (SupID, OkpdID)
   )
 
 --Создание таблицы для хранения статистики по взаимодейтсию поставщика и заказчика
@@ -81,8 +81,12 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sup_org_stats' AND xtype='U'
   )
   
 GO
---Заполнение таблицы со статистикой по поставщикам
-INSERT INTO sup_stats 
+--I: Заполнение таблицы со статистикой по поставщикам
+INSERT INTO sup_stats (
+  SupID, sup_cntr_num, sup_running_cntr_num, sup_good_cntr_num, 
+  sup_fed_cntr_num, sup_sub_cntr_num, sup_mun_cntr_num, 
+  sup_cntr_avg_price, sup_cntr_avg_penalty
+)
 SELECT
 sup.ID,
 guest.sup_num_of_contracts(sup.ID),
@@ -92,15 +96,23 @@ guest.sup_num_of_contracts_lvl(sup.ID, 1),
 guest.sup_num_of_contracts_lvl(sup.ID, 2),
 guest.sup_num_of_contracts_lvl(sup.ID, 3),
 guest.sup_avg_contract_price(sup.ID),
-guest.sup_avg_penalty_share(sup.ID),
-guest.sup_no_penalty_cntr_share(sup.ID),
-guest.sup_one_side_severance_share(sup.ID),
-guest.sup_one_side_org_severance_share(sup.ID)
+guest.sup_avg_penalty_share(sup.ID)
 FROM DV.d_OOS_Suppliers AS sup
 
 GO
---Заполнение таблицы со статистикой по заказчикам
-INSERT INTO org_stats 
+--II: Заполнение таблицы со статистикой по поставщикам
+UPDATE sup_stats
+SET 
+  sup_no_pnl_share = guest.sup_no_penalty_cntr_share(supID, sup_cntr_num),
+  sup_1s_sev = guest.sup_one_side_severance_share(supID, sup_cntr_num),
+  sup_1s_org_sev = guest.sup_one_side_org_severance_share(supID, sup_cntr_num)
+
+GO
+--I: Заполнение таблицы со статистикой по заказчикам
+INSERT INTO org_stats (
+  OrgID, org_cntr_num, org_running_cntr_num, org_good_cntr_num,
+  org_fed_cntr_num, org_sub_cntr_num, org_mun_cntr_num, org_cntr_avg_price
+)
 SELECT
 org.ID,
 guest.org_num_of_contracts(org.ID),
@@ -109,42 +121,46 @@ guest.org_num_of_good_contracts(org.ID),
 guest.org_num_of_contracts_lvl(org.ID, 1),
 guest.org_num_of_contracts_lvl(org.ID, 2),
 guest.org_num_of_contracts_lvl(org.ID, 3),
-guest.org_avg_contract_price(org.ID),
-guest.org_one_side_severance_share(org.ID),
-guest.org_one_side_supplier_severance_share(org.ID)
+guest.org_avg_contract_price(org.ID)
 FROM DV.d_OOS_Org AS org
 
 GO
---Заполнение таблицы со статистикой по ОКПД: количество завершенных контрактов по ОКПД
-INSERT INTO okpd_stats (okpd_stats.code, okpd_stats.cntr_num)
-SELECT okpd.Code, COUNT(cntr.ID)
+--II: Заполнение таблицы со статистикой по заказчикам
+UPDATE org_stats
+SET
+  org_1s_sev = guest.org_one_side_severance_share(orgID, org_cntr_num),
+  org_1s_sup_sev = guest.org_one_side_supplier_severance_share(orgID, org_cntr_num)
+
+GO
+--I: Заполнение таблицы со статистикой по ОКПД: количество завершенных контрактов по ОКПД
+INSERT INTO okpd_stats (okpd_stats.OkpdID, okpd_stats.code, okpd_stats.cntr_num)
+SELECT okpd.ID, okpd.Code, COUNT(cntr.ID)
 FROM 
 DV.d_OOS_OKPD2 AS okpd 
 INNER JOIN DV.d_OOS_Products AS prods ON prods.RefOKPD2 = okpd.ID
 INNER JOIN DV.f_OOS_Product AS prod ON prod.RefProduct = prods.ID
 INNER JOIN DV.d_OOS_Contracts AS cntr ON cntr.ID = prod.RefContract
-INNER JOIN DV.fx_OOS_ContractStage AS cntrSt ON cntrSt.ID = cntr.RefStage
-WHERE cntrSt.ID IN (3, 4)
-GROUP BY okpd.Code
+WHERE cntr.RefStage IN (3, 4)
+GROUP BY okpd.ID, okpd.Code
 
---Заполнение таблицы со статистикой по ОКПД: количество хороших контрактов по ОКПД
+GO
+--II: Заполнение таблицы со статистикой по ОКПД: количество хороших контрактов по ОКПД
 UPDATE okpd_stats
 SET okpd_stats.good_cntr_num = t.good_cntr_num
 FROM
 (
-  SELECT okpd.code, COUNT(cntr.ID) AS 'good_cntr_num'
+  SELECT okpd.ID AS OkpdID, COUNT(cntr.ID) AS 'good_cntr_num'
   FROM 
   DV.d_OOS_OKPD2 AS okpd 
   INNER JOIN DV.d_OOS_Products AS prods ON prods.RefOKPD2 = okpd.ID
   INNER JOIN DV.f_OOS_Product AS prod ON prod.RefProduct = prods.ID
   INNER JOIN DV.d_OOS_Contracts AS cntr ON cntr.ID = prod.RefContract
-  INNER JOIN DV.fx_OOS_ContractStage AS cntrSt ON cntrSt.ID = cntr.RefStage
   WHERE 
     guest.pred_variable(cntr.ID) = 1 AND
-    cntrSt.ID IN (3, 4)
-  GROUP BY okpd.Code
+    cntr.RefStage IN (3, 4)
+  GROUP BY okpd.ID
 )t
-WHERE t.code = okpd_stats.code
+WHERE t.OkpdID = okpd_stats.OkpdID
 
 GO
 --Заполнение таблицы со статистикой по территориям
@@ -163,18 +179,15 @@ GO
 GO
 -- Заполнение таблицы okpd_sup_stats
 INSERT INTO okpd_sup_stats
-SELECT t.ID, t.Code, guest.sup_okpd_cntr_num(t.ID, t.Code)
+SELECT t.SupID, t.OkpdID, guest.sup_okpd_cntr_num(t.SupID, t.okpdID)
 FROM 
 (
-  SELECT DISTINCT sup.ID, okpd.Code
+  SELECT DISTINCT sup.ID AS SupID, prods.RefOKPD2 AS okpdID
   FROM DV.f_OOS_Product AS prod
   INNER JOIN DV.d_OOS_Suppliers AS sup ON sup.ID = prod.RefSupplier
-  INNER JOIN DV.d_OOS_Org AS org ON org.ID = prod.RefOrg
   INNER JOIN DV.d_OOS_Contracts AS cntr ON cntr.ID = prod.RefContract
-  INNER JOIN DV.fx_OOS_ContractStage AS cntrSt ON cntrSt.ID = cntr.RefStage
   INNER JOIN DV.d_OOS_Products AS prods ON prods.ID = prod.RefProduct
-  INNER JOIN DV.d_OOS_OKPD2 AS okpd ON okpd.ID = prods.RefOKPD2
-  WHERE cntrSt.ID in (3, 4)
+  WHERE cntr.RefStage in (3, 4)
 )t
 
 GO
@@ -185,6 +198,4 @@ FROM DV.f_OOS_Value AS val
 INNER JOIN DV.d_OOS_Suppliers AS sup ON sup.ID = val.RefSupplier
 INNER JOIN DV.d_OOS_Org AS org ON org.ID = val.RefOrg
 INNER JOIN DV.d_OOS_Contracts AS cntr ON cntr.ID = val.RefContract
-INNER JOIN DV.d_OOS_ClosContracts As cntrCls ON cntrCls.RefContract = cntr.ID
-INNER JOIN DV.fx_OOS_ContractStage AS cntrSt ON cntrSt.ID = cntr.RefStage
-WHERE cntrSt.ID IN (3, 4)
+WHERE cntr.RefStage IN (3, 4)

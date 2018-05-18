@@ -1,4 +1,4 @@
-﻿CREATE FUNCTION guest.sup_one_side_severance_share (@SupID INT)
+﻿CREATE FUNCTION guest.sup_one_side_severance_share (@SupID INT, @NumOfCntr INT)
 
 /*
 Сканадальность поставщика: доля контрактов с разрывом отношений в одностороннем порядке по решению поставшика. 
@@ -11,7 +11,6 @@
 RETURNS FLOAT
 AS
 BEGIN
-  DECLARE @num_of_contracts FLOAT = guest.sup_num_of_contracts(@SupID)
   DECLARE @num_of_bad_contracts INT = (
   	SELECT COUNT(*)
   	FROM
@@ -21,19 +20,17 @@ BEGIN
   		INNER JOIN DV.d_OOS_Suppliers AS sup ON sup.ID = val.RefSupplier
   		INNER JOIN DV.d_OOS_Contracts AS cntr ON cntr.ID = val.RefContract
   		INNER JOIN DV.d_OOS_ClosContracts As cntrCls ON cntrCls.RefContract = cntr.ID
-  		INNER JOIN DV.fx_OOS_ContractStage AS st ON st.ID = cntr.RefStage
-  		INNER JOIN DV.d_OOS_TerminReason AS t ON t.ID = cntrCls.RefTerminReason
+  		INNER JOIN DV.d_OOS_TerminReason AS trmn ON trmn.ID = cntrCls.RefTerminReason
   		WHERE 
-  			t.Code IN (8326975, 8361023, 8724083) AND 
+  			trmn.Code IN (8326975, 8361023, 8724083) AND 
   			sup.ID = @SupID
   	)t
   )
   
-  -- Обработка случая, когда у поставщика еще нет ни одного завершенного контракта
-  IF @num_of_contracts = 0
+  IF @NumOfCntr = 0
   BEGIN
     RETURN 0
   END
   
-  RETURN ROUND(@num_of_bad_contracts / @num_of_contracts, 5)
+  RETURN ROUND(@num_of_bad_contracts / @NumOfCntr, 3)
 END
