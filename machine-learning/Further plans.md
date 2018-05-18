@@ -13,13 +13,16 @@
 1. Обработка выбросов (+)
 
 ### Архитектура кода
-1. Добавление построения ROC-кривой в функцию test_model
+1. Добавление построения ROC-кривой в функцию test_model (+)
 2. Добавление построения precision_recall_curve в learn_one_model
 
 ### Предметная область
-1. Как OKPD связан с OKVED?
-2. Как устроен [OKPD2](http://classifikators.ru/okpd)?
-3. Какую роль играет [KBK](http://kcbux.ru/Spravochnik/kbk/sp_00_kbk-struktura.html)?
+1. Как устроен [OKPD2](http://classifikators.ru/okpd)?
+2. Какую роль играет [KBK](http://kcbux.ru/Spravochnik/kbk/sp_00_kbk-struktura.html)?
+
+## Задачи
+1. Построить модель на федеральных контрактах и подготовить по ним презентацию
+2. Структурировать имеющиеся знания и материалы на текущий момент
 
 ### Архитектура решения 
 1. Перенос модели через .pkl в Java среду
