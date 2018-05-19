@@ -6,6 +6,7 @@
 """
 
 import random
+from db import get_data
 
 class Model:
     def __init__(self, reg_nums: list):
@@ -37,9 +38,12 @@ class Model:
         3. Построение предсказания
         """
 
+        # Извлечение данных из БД
+        data = get_data(self.reg_nums)
+
         # TODO: убрать заглушка по построению предсказания
         response = []
-        for reg_num in self.reg_nums:
+        for reg_num in data.cntr_reg_num.values:
             # Случайные предсказания
             pred_class = random.randint(0, 1)
             pred_proba = random.uniform(0, 0.49) if not pred_class else random.uniform(0.5, 1)

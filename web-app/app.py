@@ -16,6 +16,7 @@ from config import config
 app = Flask(__name__)
 api = Api(app)
 
+
 class Prediction(Resource):
     def get(self):
         args = parser.parse_args()
@@ -44,9 +45,11 @@ parser.add_argument('regnum', type=json.loads, action='append')
 
 api.add_resource(Prediction, '/predict')
 
+
 @app.route('/')
 def main():
     return '<center><h1>Домашняя страница WEB API к МО-модели</h1></center>'
+
 
 if __name__ == '__main__':
     app.run(debug=True)
