@@ -182,20 +182,26 @@ INSERT INTO okpd_sup_stats
 SELECT t.SupID, t.OkpdID, guest.sup_okpd_cntr_num(t.SupID, t.okpdID)
 FROM 
 (
-  SELECT DISTINCT sup.ID AS SupID, prods.RefOKPD2 AS okpdID
+  SELECT sup.ID AS SupID, prods.RefOKPD2 AS okpdID
   FROM DV.f_OOS_Product AS prod
   INNER JOIN DV.d_OOS_Suppliers AS sup ON sup.ID = prod.RefSupplier
   INNER JOIN DV.d_OOS_Contracts AS cntr ON cntr.ID = prod.RefContract
   INNER JOIN DV.d_OOS_Products AS prods ON prods.ID = prod.RefProduct
   WHERE cntr.RefStage in (3, 4)
+  GROUP BY sup.ID, prods.RefOKPD2
 )t
 
 GO
 -- Заполнение таблицы sup_org_stats
 INSERT INTO sup_org_stats
-SELECT DISTINCT sup.ID, org.ID, guest.sup_org_cntr_num(sup.ID, org.ID)
-FROM DV.f_OOS_Value AS val
-INNER JOIN DV.d_OOS_Suppliers AS sup ON sup.ID = val.RefSupplier
-INNER JOIN DV.d_OOS_Org AS org ON org.ID = val.RefOrg
-INNER JOIN DV.d_OOS_Contracts AS cntr ON cntr.ID = val.RefContract
-WHERE cntr.RefStage IN (3, 4)
+SELECT t.supID, t.orgID, guest.sup_org_cntr_num(t.supID, t.orgID)
+FROM
+(
+  SELECT sup.ID AS SupID, org.ID AS OrgID
+  FROM DV.f_OOS_Value AS val
+  INNER JOIN DV.d_OOS_Suppliers AS sup ON sup.ID = val.RefSupplier
+  INNER JOIN DV.d_OOS_Org AS org ON org.ID = val.RefOrg
+  INNER JOIN DV.d_OOS_Contracts AS cntr ON cntr.ID = val.RefContract
+  WHERE cntr.RefStage IN (3, 4)
+  GROUP BY sup.ID, org.ID
+)t
