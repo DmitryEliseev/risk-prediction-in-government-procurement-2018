@@ -1,4 +1,10 @@
-﻿CREATE FUNCTION guest.pred_variable (@CntrID INT)
+﻿IF EXISTS(SELECT * FROM sysobjects WHERE type IN ('FN', 'TF') AND name='pred_variable')
+BEGIN
+  DROP FUNCTION guest.pred_variable
+END
+GO
+
+CREATE FUNCTION guest.pred_variable (@CntrID INT)
 
 /*
 Функция, которая определяет является ли контракт хорошим или плохим (целевая переменная).
@@ -14,14 +20,14 @@ BEGIN
   DECLARE @PredVar INT = (
     SELECT 'pred_var' =
   	  CASE
-    		WHEN
-    		  t.Code = 0 OR
-    		  (
+    	WHEN
+			t.Code = 0 OR
+    		(
     			t.Code IN (8361024,8724080,1) AND 
-          t.Price > 0 AND
+				t.Price > 0 AND
     			t.Done / t.Price >= 0.6
-    		  ) THEN 1
-    		ELSE 0
+    		) THEN 1
+    	ELSE 0
   	  END
   	FROM
   	(
@@ -41,3 +47,4 @@ BEGIN
   )
   RETURN @PredVar
 END
+GO

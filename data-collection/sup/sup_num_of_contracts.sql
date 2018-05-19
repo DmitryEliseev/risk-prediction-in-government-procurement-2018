@@ -1,4 +1,10 @@
-﻿CREATE FUNCTION guest.sup_num_of_contracts (@SupID INT)
+﻿IF EXISTS(SELECT * FROM sysobjects WHERE type IN ('FN', 'TF') AND name='sup_num_of_contracts')
+BEGIN
+  DROP FUNCTION guest.sup_num_of_contracts
+END
+GO
+
+CREATE FUNCTION guest.sup_num_of_contracts (@SupID INT)
 
 /*
 Количество завершенных контрактов у поставщика
@@ -18,3 +24,4 @@ BEGIN
   )
   RETURN @num_of_all_finished_contracts
 END
+GO

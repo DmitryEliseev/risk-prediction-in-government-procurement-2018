@@ -1,4 +1,10 @@
-﻿CREATE FUNCTION guest.sup_no_penalty_cntr_share (@SupID INT, @NumOfCntr INT)
+﻿IF EXISTS(SELECT * FROM sysobjects WHERE type IN ('FN', 'TF') AND name='sup_no_penalty_cntr_share')
+BEGIN
+  DROP FUNCTION guest.sup_no_penalty_cntr_share
+END
+GO
+
+CREATE FUNCTION guest.sup_no_penalty_cntr_share (@SupID INT, @NumOfCntr INT)
 
 /*
 Доля контрактов без пени от общего числе завершенных поставщиком контрактов
@@ -31,3 +37,4 @@ BEGIN
   
   RETURN ROUND(@no_penalty_cntr_num / @NumOfCntr, 3)
 END
+GO

@@ -1,4 +1,10 @@
-﻿CREATE FUNCTION guest.sup_avg_penalty_share (@SupID INT)
+﻿IF EXISTS(SELECT * FROM sysobjects WHERE type IN ('FN', 'TF') AND name='sup_avg_penalty_share')
+BEGIN
+  DROP FUNCTION guest.sup_avg_penalty_share
+END
+GO
+
+CREATE FUNCTION guest.sup_avg_penalty_share (@SupID INT)
 
 /*
 Усредненная доля начисленных пени от цены контракта по всем заверщенным контрактам
@@ -30,3 +36,4 @@ BEGIN
   
   RETURN ROUND(@avg_penalty_share, 3)
 END
+GO

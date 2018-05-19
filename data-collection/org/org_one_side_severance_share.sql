@@ -1,4 +1,10 @@
-﻿CREATE FUNCTION guest.org_one_side_severance_share (@OrgID INT, @NumOfCntr INT)
+﻿IF EXISTS(SELECT * FROM sysobjects WHERE type IN ('FN', 'TF') AND name='org_one_side_severance_share')
+BEGIN
+  DROP FUNCTION guest.org_one_side_severance_share
+END
+GO
+
+CREATE FUNCTION guest.org_one_side_severance_share (@OrgID INT, @NumOfCntr INT)
 
 /*
 Скандальность заказчика: доля контрактов с разрывом отношений в одностороннем порядке по решению заказчика.
@@ -35,3 +41,4 @@ BEGIN
   
   RETURN ROUND(@num_of_bad_contracts / @NumOfCntr, 3)
 END
+GO

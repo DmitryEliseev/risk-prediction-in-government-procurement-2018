@@ -1,4 +1,10 @@
-﻿CREATE FUNCTION guest.org_num_of_contracts (@OrgID INT)
+﻿IF EXISTS(SELECT * FROM sysobjects WHERE type IN ('FN', 'TF') AND name='org_num_of_contracts')
+BEGIN
+  DROP FUNCTION guest.org_num_of_contracts
+END
+GO
+
+CREATE FUNCTION guest.org_num_of_contracts (@OrgID INT)
 
 /*
 Количество завершенных контрактов у заказчика
@@ -18,3 +24,4 @@ BEGIN
   )
   RETURN @num_of_all_finished_contracts
 END
+GO

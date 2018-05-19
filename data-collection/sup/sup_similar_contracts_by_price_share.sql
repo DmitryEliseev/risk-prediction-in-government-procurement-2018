@@ -1,4 +1,10 @@
-﻿CREATE FUNCTION guest.sup_similar_contracts_by_price_share (@SupID INT, @NumOfCntr INT, @CntrPrice BIGINT)
+﻿IF EXISTS(SELECT * FROM sysobjects WHERE type IN ('FN', 'TF') AND name='sup_similar_contracts_by_price_share')
+BEGIN
+  DROP FUNCTION guest.sup_similar_contracts_by_price_share
+END
+GO
+
+CREATE FUNCTION guest.sup_similar_contracts_by_price_share (@SupID INT, @NumOfCntr INT, @CntrPrice BIGINT)
 
 /*
 Количество завершенных контрактов у поставщика, цена которых отличается от цены текущего контракте не более, чем на 20%
@@ -27,3 +33,4 @@ BEGIN
   
   RETURN ROUND(@num_of_similar_contracts_by_price / @NumOfCntr, 3)
 END
+GO

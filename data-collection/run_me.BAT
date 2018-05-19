@@ -4,7 +4,10 @@ set /p server_name="Input server name: "
 set /p username="Input user name: "
 set /p pwd="Input password: "
 
-cd org
+cd utils
+for %%G in (*.sql) do sqlcmd /S %server_name% /d %db_name% -U %username% -P %pwd% -i"%%G"
+
+cd ../org
 for %%G in (*.sql) do sqlcmd /S %server_name% /d %db_name% -U %username% -P %pwd% -i"%%G"
 
 cd ../sup

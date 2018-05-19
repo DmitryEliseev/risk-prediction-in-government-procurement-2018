@@ -1,4 +1,10 @@
-﻿CREATE FUNCTION guest.sup_okpd_cntr_num (@SupID INT, @OkpdID INT)
+﻿IF EXISTS(SELECT * FROM sysobjects WHERE type IN ('FN', 'TF') AND name='sup_okpd_cntr_num')
+BEGIN
+  DROP FUNCTION guest.sup_okpd_cntr_num
+END
+GO
+
+CREATE FUNCTION guest.sup_okpd_cntr_num (@SupID INT, @OkpdID INT)
 
 /*
 Количество завершенных контрактов для конкретного ОКПД и поставщика
@@ -24,3 +30,4 @@ BEGIN
   ) 
   RETURN @cur_okpd_contracts_num
 END
+GO

@@ -1,4 +1,10 @@
-﻿CREATE FUNCTION guest.org_avg_contract_price (@OrgID INT)
+﻿IF EXISTS(SELECT * FROM sysobjects WHERE type IN ('FN', 'TF') AND name='org_avg_contract_price')
+BEGIN
+  DROP FUNCTION guest.org_avg_contract_price
+END
+GO
+
+CREATE FUNCTION guest.org_avg_contract_price (@OrgID INT)
 
 /*
 Средняя цена контракта заказчика
@@ -18,3 +24,4 @@ BEGIN
   )
   RETURN @AvgPrice
 END
+GO

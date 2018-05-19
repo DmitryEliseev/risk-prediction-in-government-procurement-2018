@@ -1,4 +1,10 @@
-﻿CREATE FUNCTION guest.sup_one_side_org_severance_share (@SupID INT, @NumOfCntr INT)
+﻿IF EXISTS(SELECT * FROM sysobjects WHERE type IN ('FN', 'TF') AND name='sup_one_side_org_severance_share')
+BEGIN
+  DROP FUNCTION guest.sup_one_side_org_severance_share
+END
+GO
+
+CREATE FUNCTION guest.sup_one_side_org_severance_share (@SupID INT, @NumOfCntr INT)
 
 /*
 Репутация поставщика: доля контрактов с разрывом отношений в одностороннем порядке по решению заказчика.
@@ -34,3 +40,4 @@ BEGIN
   
   RETURN ROUND(@num_of_bad_contracts / @NumOfCntr, 3)
 END
+GO
