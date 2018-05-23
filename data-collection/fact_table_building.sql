@@ -3,14 +3,13 @@
 */
 
 --Создание таблицы для хранения выборки
-GO
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sample' AND xtype='U')
   CREATE TABLE guest.sample (
-    ID INT NOT NULL IDENTITY(1,1) PRIMARY KEY,
     valID INT NOT NULL,
     cntrID INT NOT NULL,
     supID INT NOT NULL,
     orgID INT NOT NULL,
+    okpdID INT NOT NULL,
     cntr_reg_num VARCHAR(19),
     
     --Поставщик
@@ -58,18 +57,26 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sample' AND xtype='U')
     price_too_low BIT,
 
     --Целевая переменная
-    cntr_result BIT
-
+    cntr_result BIT,
+    
+     --Составной первичный ключ
+    PRIMARY KEY (valID, cntrID, supID, orgID, okpdID)
   )
+GO
+
+--Если будет попытка вставить запись, нарушающую уникальность первичного ключа,
+--то данная попытка будет проигнорирована
+ALTER TABLE guest.sample REBUILD WITH (IGNORE_DUP_KEY = ON)
+GO
 
 --Заполнение плохими контрактами
-GO
 INSERT INTO guest.sample
 SELECT
 val.ID, 
 cntr.ID,
 val.RefSupplier,
 org.ID,
+okpd.ID,
 cntr.RegNum,
 
 --Поставщик
@@ -85,7 +92,7 @@ guest.sup_stats.sup_no_pnl_share,
 guest.sup_stats.sup_1s_sev,
 guest.sup_stats.sup_1s_org_sev,
 guest.okpd_sup_stats.cntr_num AS 'sup_okpd_cntr_num',
-NULL,
+NULL, --Вычисление позже
 
 --Заказчик
 guest.org_stats.org_cntr_num,
@@ -97,7 +104,7 @@ guest.org_stats.org_mun_cntr_num AS 'org_mun_cntr_num',
 guest.org_stats.org_cntr_avg_price,
 guest.org_stats.org_1s_sev,
 guest.org_stats.org_1s_sup_sev,
-NULL,
+NULL, --Вычисление позже
 guest.sup_org_stats.cntr_num AS 'cntr_num_together',
 org.RefTypeOrg AS 'org_type',
 
@@ -140,15 +147,16 @@ WHERE
   guest.org_stats.org_cntr_num > 0 AND --Количество контрактов у организации больше 0
   guest.sup_stats.sup_cntr_num > 0 AND --Количество контрактов у поставщика больше 0
   cntr_stats.result = 0 --Контракт плохой
+GO
 
 --Заполнение хорошими контрактами
-GO
 INSERT INTO guest.sample
 SELECT TOP(CAST(@@ROWCOUNT*1.5 AS INT))
 val.ID, 
 cntr.ID,
 val.RefSupplier,
 org.ID,
+okpd.ID,
 cntr.RegNum,
 
 --Поставщик
