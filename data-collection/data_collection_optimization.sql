@@ -3,14 +3,6 @@
 и сохранение результатов в промежуточные таблицы
 */
 
---DROP TABLE sup_stats
---DROP TABLE org_stats
---DROP TABLE okpd_stats
-----DROP TABLE ter_stats
---DROP TABLE okpd_sup_stats
---DROP TABLE sup_org_stats
-
-GO
 --Создание таблицы для хранения статистики по поставщикам
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sup_stats' AND xtype='U')
   CREATE TABLE guest.sup_stats (
@@ -80,7 +72,14 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sup_org_stats' AND xtype='U'
     PRIMARY KEY (SupID, OrgID)
   )
   
+  --Таблица для статистики по контрактам
+  IF NOT EXISTS (SELECT * FROM sysobjects WHERE name = 'cntr_stats' AND xtype='U')
+    CREATE TABLE guest.cntr_stats (
+      CntrID INT NOT NULL PRIMARY KEY,
+      result BIT
+    )
 GO
+
 --I: Заполнение таблицы со статистикой по поставщикам
 INSERT INTO sup_stats (
   SupID, sup_cntr_num, sup_running_cntr_num, sup_good_cntr_num, 
@@ -98,16 +97,14 @@ guest.sup_num_of_contracts_lvl(sup.ID, 3),
 guest.sup_avg_contract_price(sup.ID),
 guest.sup_avg_penalty_share(sup.ID)
 FROM DV.d_OOS_Suppliers AS sup
-
-GO
 --II: Заполнение таблицы со статистикой по поставщикам
 UPDATE sup_stats
 SET 
   sup_no_pnl_share = guest.sup_no_penalty_cntr_share(supID, sup_cntr_num),
   sup_1s_sev = guest.sup_one_side_severance_share(supID, sup_cntr_num),
   sup_1s_org_sev = guest.sup_one_side_org_severance_share(supID, sup_cntr_num)
+GO -- 5.7 млн строк за 12ч20мин
 
-GO
 --I: Заполнение таблицы со статистикой по заказчикам
 INSERT INTO org_stats (
   OrgID, org_cntr_num, org_running_cntr_num, org_good_cntr_num,
@@ -123,15 +120,13 @@ guest.org_num_of_contracts_lvl(org.ID, 2),
 guest.org_num_of_contracts_lvl(org.ID, 3),
 guest.org_avg_contract_price(org.ID)
 FROM DV.d_OOS_Org AS org
-
-GO
 --II: Заполнение таблицы со статистикой по заказчикам
 UPDATE org_stats
 SET
   org_1s_sev = guest.org_one_side_severance_share(orgID, org_cntr_num),
   org_1s_sup_sev = guest.org_one_side_supplier_severance_share(orgID, org_cntr_num)
+GO --300 тыс. строк за 10ч
 
-GO
 --I: Заполнение таблицы со статистикой по ОКПД: количество завершенных контрактов по ОКПД
 INSERT INTO okpd_stats (okpd_stats.OkpdID, okpd_stats.code, okpd_stats.cntr_num)
 SELECT okpd.ID, okpd.Code, COUNT(cntr.ID)
@@ -142,8 +137,6 @@ INNER JOIN DV.f_OOS_Product AS prod ON prod.RefProduct = prods.ID
 INNER JOIN DV.d_OOS_Contracts AS cntr ON cntr.ID = prod.RefContract
 WHERE cntr.RefStage IN (3, 4)
 GROUP BY okpd.ID, okpd.Code
-
-GO
 --II: Заполнение таблицы со статистикой по ОКПД: количество хороших контрактов по ОКПД
 UPDATE okpd_stats
 SET okpd_stats.good_cntr_num = t.good_cntr_num
@@ -161,8 +154,8 @@ FROM
   GROUP BY okpd.ID
 )t
 WHERE t.OkpdID = okpd_stats.OkpdID
+GO --19 тыс. строк за 2ч40мин
 
-GO
 --Заполнение таблицы со статистикой по территориям
 --INSERT INTO ter_stats 
 --SELECT 
@@ -175,8 +168,8 @@ GO
 --  ter.Code1
 --  FROM DV.d_Territory_RF AS ter
 --)t
+--GO
 
-GO
 -- Заполнение таблицы okpd_sup_stats
 INSERT INTO okpd_sup_stats
 SELECT t.SupID, t.OkpdID, guest.sup_okpd_cntr_num(t.SupID, t.okpdID)
@@ -190,8 +183,8 @@ FROM
   WHERE cntr.RefStage in (3, 4)
   GROUP BY sup.ID, prods.RefOKPD2
 )t
+GO --5.1 млн строк за 16ч24мин
 
-GO
 -- Заполнение таблицы sup_org_stats
 INSERT INTO sup_org_stats
 SELECT t.supID, t.orgID, guest.sup_org_cntr_num(t.supID, t.orgID)
@@ -205,3 +198,15 @@ FROM
   WHERE cntr.RefStage IN (3, 4)
   GROUP BY sup.ID, org.ID
 )t
+GO --6.2 млн строк за 10ч15мин
+
+--Заполнение таблицы cntr_stats результатами исполнения контрактов
+INSERT INTO guest.cntr_stats
+SELECT t.cntrID, guest.pred_variable(t.cntrID)
+FROM
+(
+  SELECT DISTINCT cntr.ID AS cntrID
+  FROM DV.d_OOS_Contracts cntr
+  WHERE cntr.RefSignDate > 20150000 AND cntr.RefStage IN (3, 4)
+)t
+GO --5.3 млн
