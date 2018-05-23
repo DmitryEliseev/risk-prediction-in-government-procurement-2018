@@ -15,6 +15,12 @@
 6. [What is LightGBM](https://medium.com/@pushkarmandot/https-medium-com-pushkarmandot-what-is-lightgbm-how-to-implement-it-how-to-fine-tune-the-parameters-60347819b7fc)
 7. [Light GBM vs XGBOOST](https://www.analyticsvidhya.com/blog/2017/06/which-algorithm-takes-the-crown-light-gbm-vs-xgboost/)
 
+### SQL оптимизация
+1. [Оптимизация SQL-запросов ч.1](http://ts-soft.ru/blog/sql-optimization-1)
+2. [Оптимизация SQL-запросов ч.2](http://ts-soft.ru/blog/sql-optimization-2)
+3. [Create Indexes with Included Columns](https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-2017)
+4. [Create Index in T-SQL](https://docs.microsoft.com/en-us/sql/t-sql/statements/create-index-transact-sql?view=sql-server-2017)
+
 ### Прочее интересное
 1. [Инструменты для машинного обучения для основных языков](https://github.com/josephmisiti/awesome-machine-learning)
 2. [A minimal benchmark for scalability, speed and accuracy of commonly used open source implementations of the top machine learning algorithms for binary classification](https://github.com/szilard/benchm-ml)
