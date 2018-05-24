@@ -209,4 +209,4 @@ FROM
   FROM DV.d_OOS_Contracts cntr
   WHERE cntr.RefSignDate > 20150000 AND cntr.RefStage IN (3, 4)
 )t
-GO --5.3 млн
+GO --5.3 млн за 1ч10мин

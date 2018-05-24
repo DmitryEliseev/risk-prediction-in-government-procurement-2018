@@ -1,5 +1,5 @@
 ﻿/*
-Построение финальной выборки
+Сбор обучающей выборки
 */
 
 --Создание таблицы для хранения выборки
@@ -238,4 +238,4 @@ FROM guest.sample s
 INNER JOIN DV.f_OOS_Value val ON s.valID = val.ID
 INNER JOIN guest.sup_stats ss ON ss.SupID = val.RefSupplier
 INNER JOIN guest.org_stats os ON os.OrgID = val.RefOrg
-GO
+GO --72 тыс. строк за 1ч22мин
