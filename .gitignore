@@ -14,3 +14,8 @@ machine-learning/experiments
 web-app/setting.ini
 web-app/.idea
 web-app/__pycache__
+
+data/4/data.csv
+data/4/predict.csv
+data/4/train_test.csv
+data/4/whole_sample.csv
