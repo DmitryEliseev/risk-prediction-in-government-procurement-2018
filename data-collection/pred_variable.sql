@@ -20,8 +20,8 @@ BEGIN
   DECLARE @PredVar INT = (
     SELECT 'pred_var' =
   	  CASE
-    	  WHEN t.Code = 0 OR (t.Code IN (8361024,8724080,1) AND t.Price > 0 AND t.Done / t.Price >= 0.6) THEN 1
-      	ELSE 0
+    	  WHEN t.Code = 0 OR (t.Code IN (8361024,8724080,1) AND t.Price > 0 AND t.Done / t.Price >= 0.6) THEN 0
+      	ELSE 1
   	  END
   	FROM
   	(

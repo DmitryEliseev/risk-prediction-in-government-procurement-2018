@@ -63,7 +63,7 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='okpd_sup_stats' AND xtype='U
     PRIMARY KEY (SupID, OkpdID)
   )
 
---Создание таблицы для хранения статистики по взаимодейтсию поставщика и заказчика
+--Создание таблицы для хранения статистики по взаимодействию поставщика и заказчика
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sup_org_stats' AND xtype='U')
   CREATE TABLE guest.sup_org_stats (
     SupID INT NOT NULL,

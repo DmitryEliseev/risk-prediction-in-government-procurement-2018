@@ -146,7 +146,7 @@ WHERE
   cntr.RefSignDate > 20150000 AND --Контракт заключен не ранее 2015 года
   guest.org_stats.org_cntr_num > 0 AND --Количество контрактов у организации больше 0
   guest.sup_stats.sup_cntr_num > 0 AND --Количество контрактов у поставщика больше 0
-  cntr_stats.result = 0 --Контракт плохой
+  cntr_stats.result = 1 --Контракт плохой
 GO
 
 --Заполнение хорошими контрактами
@@ -226,7 +226,7 @@ WHERE
   cntr.RefSignDate > 20150000 AND --Контракт заключен не ранее 2015 года
   guest.org_stats.org_cntr_num > 0 AND --Количество контрактов у организации больше 0
   guest.sup_stats.sup_cntr_num > 0 AND --Количество контрактов у поставщика больше 0
-  guest.cntr_stats.result = 1 --Контракт хороший
+  guest.cntr_stats.result = 0 --Контракт хороший
 ORDER BY NEWID()
 GO
 
