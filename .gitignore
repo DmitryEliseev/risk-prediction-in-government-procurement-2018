@@ -2,6 +2,7 @@
 .DS_Store
 data/.DS_Store
 machine-learning/.DS_Store
+.idea/
 
 *.tsv
 *.xlsx
@@ -14,6 +15,10 @@ machine-learning/experiments
 web-app/setting.ini
 web-app/.idea
 web-app/__pycache__
+
+demo/setting.ini
+demo/.idea
+demo/__pycache__
 
 data/4/data.csv
 data/4/predict.csv
