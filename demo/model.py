@@ -45,7 +45,6 @@ class CntrClassifier:
         self._save_scaler()
 
     def train(self):
-        # TODO: Заглушка
         data = get_data()
         X, y = self._prepocess_data(data)
 
@@ -60,18 +59,15 @@ class CntrClassifier:
         self._model.fit(X, y)
         self._save_model()
 
-    def predict(self):
-        raise NotImplementedError
+    def predict(self, data):
+        X, y = self._prepocess_data(data)
+        return self._model.predict(X, y)
 
-    def predict_proba(self, data: list):
+    def predict_proba(self, data):
         """Построение предсказаний"""
 
-        """
-        1. Предобработка данных
-        2. Построение предсказания
-        """
-
-        raise NotImplementedError
+        X, y = self._prepocess_data(data)
+        return self._model.predict_proba(X, y)
 
     def _load_model(self):
         """Загрузка обученной модели"""
@@ -122,7 +118,8 @@ class CntrClassifier:
         df = self._process_numerical(df, num_var, num_var01, train=train)
         df = self._process_nominal(df, cat_var, cat_bin_var, train=train)
 
-        used_vars = num_var + num_var01 + cat_var + cat_bin_var + ['cntr_result']
+        df = df[num_var + num_var01 + cat_var + cat_bin_var + ['cntr_result']]
+
         X = df.drop(['cntr_result'], axis=1).values
         y = df.cntr_result.values
 
@@ -217,3 +214,7 @@ def train_and_save_model():
 def predict(data):
     clf = CntrClassifier(train=False)
     return clf.predict_proba(data)
+
+
+if __name__ == '__main__':
+    train_and_save_model()

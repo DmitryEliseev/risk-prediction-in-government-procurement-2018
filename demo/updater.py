@@ -16,15 +16,13 @@ from demo.config import config
 
 def update_predictions():
     """
-    1. Получение новых данных
-    2. Предобработка
-    3. Построение предсказаний
-    4. Занесение обратно
+    Регулярное обновление предсказаний
     """
 
     try:
+        model = CntrClassifier(train=False)
+
         data = get_sample_for_prediction()
-        model = CntrClassifier()
         predictions = model.predict_proba(data)
         update_predictions(predictions)
     # TODO: Определить Exception
