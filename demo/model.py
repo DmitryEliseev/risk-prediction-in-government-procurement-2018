@@ -29,6 +29,8 @@ class CntrClassifier:
     def __init__(self, train=True):
         self._model = None
         self._scaler = None
+        self._numerical_params_file = 'numerical_params.json'
+        self._categorical_params_file = 'categorical_params.json'
 
         if train:
             self.train()
@@ -46,6 +48,14 @@ class CntrClassifier:
 
     def train(self):
         data = get_data()
+
+        # Балансировка
+        data = CntrClassifier.balance_data(data)
+
+        # Перемешивание
+        data = data.sample(frac=1, random_state=RANDOM_SEED)
+
+        # Предобработка
         X, y = self._prepocess_data(data)
 
         self._model = GradientBoostingClassifier(
@@ -110,31 +120,50 @@ class CntrClassifier:
 
         logging.info(log_str)
 
-    def _prepocess_data(self, df, train=True):
+    def _prepocess_data(self, data, train=True):
         """Предобработка данных"""
 
         num_var, num_var01, cat_var, cat_bin_var = grouped_initial_vars()
         delete_useless_vars(num_var, num_var01, cat_var, cat_bin_var)
 
-        df = self._process_numerical(df, num_var, num_var01, train=train)
-        df = self._process_nominal(df, cat_var, cat_bin_var, train=train)
+        data = self._process_numerical(data, num_var, num_var01, train=train)
+        data = self._process_nominal(data, cat_var, cat_bin_var, train=train)
 
-        df = df[num_var + num_var01 + cat_var + cat_bin_var + ['cntr_result']]
+        data = data[num_var + num_var01 + cat_var + cat_bin_var + ['cntr_result']]
 
-        X = df.drop(['cntr_result'], axis=1).values
-        y = df.cntr_result.values
+        X = data.drop(['cntr_result'], axis=1).values
+        y = data.cntr_result.values
 
         return X, y
 
+    @staticmethod
+    def balance_data(data, good_prop=0.7):
+        """
+        Балансировка выборки так, чтобы хорошие составляли
+        от общего числа контрактов долю, равную good_prop
+        """
+        bad_cntr = data.loc[data.cntr_result == 1]
+        good_cntr = data.loc[data.cntr_result == 0]
+
+        # Необходимое количество хороших контрактов
+        needed_good_cntr = int(bad_cntr.shape[0] * good_prop / (1 - good_prop))
+
+        good_cntr = good_cntr.sample(
+            needed_good_cntr if needed_good_cntr < good_cntr.shape[0] else good_cntr.shape[0],
+            random_state=RANDOM_SEED
+        )
+
+        logging.info('Соотношение хороших и плохих на обучающей выборке: ')
+
+        return bad_cntr.append(good_cntr)
+
     def _process_numerical(self, data, num_var, num_var01, train=True):
         """Обработка количественных переменных"""
-        file_for_params = 'numerical_params.json'
-
         if train:
             params = {'percentile': {}}
             self._scaler = StandardScaler()
         else:
-            params = load_params(file_for_params)
+            params = load_params(self._numerical_params_file)
             self._load_scaler()
 
         # Предобработка количественных переменных с нефиксированной областью значения
@@ -150,7 +179,7 @@ class CntrClassifier:
             data.loc[data[nv] > ulimit, nv] = ulimit
             data.loc[data[nv] < dlimit, nv] = dlimit
 
-        save_params(file_for_params, params)
+        save_params(self._numerical_params_file, params)
 
         # Логарифмирование
         for nv in data[num_var]:
@@ -163,16 +192,12 @@ class CntrClassifier:
             data.loc[:, num_var] = self._scaler.fit_transform(data[num_var])
             self._save_scaler()
         else:
-            data.loc[:, num_var] = self.scaler.transform(data[num_var])
+            data.loc[:, num_var] = self._scaler.transform(data[num_var])
 
         return data
 
     def _process_nominal(self, data, cat_var, cat_bin_var, train=True):
         """Обработка номинальных переменных"""
-        file_for_params = 'categorical_params.json'
-
-        print('NEW' in data['okpd2'].values)
-
         if train:
             params = {
                 'grouping': {},  # Значения параметров, подлежащие группировке
@@ -204,19 +229,21 @@ class CntrClassifier:
                     params['woe'][cv][val] = woe
                     data.loc[data[cv] == val, cv] = woe
 
-            save_params(file_for_params, params)
+            save_params(self._categorical_params_file, params)
         else:
-            params = load_params(file_for_params)
+            params = load_params(self._categorical_params_file)
             for cv in cat_var:
                 # Группировка
                 data[cv] = data[cv].replace(params['grouping'][cv], 'NEW')
+
                 # WoE кодирование
-                data.loc[:, cv] = data[cv].map(params['woe'][cv])
+                data[cv] = data[cv].map(params['woe'][cv])
+
                 # Кодировка для сгруппированной переменной NEW
                 new_woe_code = params['woe'][cv].get('NEW', None)
                 if new_woe_code:
                     # Замена неизвестных значений кодом для переменной NEW
-                    data.loc[:, cv] = data[cv].fillna(new_woe_code)
+                    data[cv] = data[cv].fillna(new_woe_code)
                 else:
                     # Замена средним значением кода для этой переменной
                     avg_woe = np.average(data[data[cv].notnull()][cv])
