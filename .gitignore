@@ -8,6 +8,7 @@ machine-learning/.DS_Store
 *.xlsx
 *.json
 *.pkl
+*.log
 
 machine-learning/learn
 machine-learning/model

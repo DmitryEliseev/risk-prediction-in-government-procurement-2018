@@ -5,11 +5,12 @@
 Модель
 """
 
-import pickle
-import argparse
-import json
 import logging
-# https://stackoverflow.com/questions/8562954/python-logging-to-different-destination-using-a-configuration-file
+import logging.config
+
+# import demo.logs_helper
+import pickle
+import json
 
 import numpy as np
 import pandas as pd
@@ -19,10 +20,15 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import cross_validate
 
 from demo.db import get_train_sample
-
 from demo.config import config
 
 RANDOM_SEED = 42
+
+logging.config.fileConfig('log_config.ini')
+logger = logging.getLogger('myLogger')
+
+# if logger.handlers:
+#     logger.handlers.clear()
 
 
 class CntrClassifier:
@@ -85,7 +91,7 @@ class CntrClassifier:
             with open('model.pkl', 'rb') as file:
                 self._model = pickle.load(file)
         except FileNotFoundError as e:
-            logging.error(e)
+            logger.error(e)
 
     def _load_scaler(self):
         """Загрузка нормализатора"""
@@ -93,7 +99,7 @@ class CntrClassifier:
             with open('scaler.pkl', 'rb') as file:
                 self._scaler = pickle.load(file)
         except FileNotFoundError as e:
-            logging.error(e)
+            logger.error(e)
 
     def _save_model(self):
         """Экспорт модели"""
@@ -118,7 +124,7 @@ class CntrClassifier:
         log_str = ', '.join('{}: M: {} STD: {}'.format(
             key, np.mean(scores[key]), np.std(scores[key])) for key in metric_keys)
 
-        logging.info(log_str)
+        logger.info(log_str)
 
     def _prepocess_data(self, data, train=True):
         """Предобработка данных"""
@@ -153,9 +159,12 @@ class CntrClassifier:
             random_state=RANDOM_SEED
         )
 
-        logging.info('Соотношение хороших и плохих на обучающей выборке: ')
+        data = bad_cntr.append(good_cntr)
+        logger.info('Доля плохих на обучающей выборке: {:.2f}'.format(
+            bad_cntr.shape[0] / data.shape[0]
+        ))
 
-        return bad_cntr.append(good_cntr)
+        return data
 
     def _process_numerical(self, data, num_var, num_var01, train=True):
         """Обработка количественных переменных"""
@@ -308,7 +317,7 @@ def load_params(filename: str):
         with open(filename, 'r', encoding='utf-8') as file:
             return json.loads(file.read())
     except FileNotFoundError as e:
-        logging.error(e)
+        logger.error(e)
 
 
 def save_params(filename: str, data: dict):
@@ -335,4 +344,6 @@ def predict(data):
 
 
 if __name__ == '__main__':
+    logger.info('Начато обучение модели')
     train_and_save_model()
+    logger.info('Закончено обучение модели')
