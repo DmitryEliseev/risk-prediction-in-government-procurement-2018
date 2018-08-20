@@ -50,7 +50,7 @@ class CntrClassifier:
 
         self._model = GradientBoostingClassifier(
             random_state=RANDOM_SEED,
-            eta=0.1,
+            learning_rate=0.1,
             max_depth=3,
             n_estimators=100,
             subsample=0.85
@@ -60,13 +60,13 @@ class CntrClassifier:
         self._save_model()
 
     def predict(self, data):
-        X, y = self._prepocess_data(data)
+        X, y = self._prepocess_data(data, train=False)
         return self._model.predict(X, y)
 
     def predict_proba(self, data):
         """Построение предсказаний"""
 
-        X, y = self._prepocess_data(data)
+        X, y = self._prepocess_data(data, train=False)
         return self._model.predict_proba(X, y)
 
     def _load_model(self):
@@ -97,6 +97,7 @@ class CntrClassifier:
 
     def assess_model_quality(self, kfold=10):
         data = get_data()
+
         X, y = self._prepocess_data(data)
 
         metrics = ('roc_auc', 'accuracy', 'neg_log_loss')
@@ -125,13 +126,103 @@ class CntrClassifier:
 
         return X, y
 
-    def _process_numerical(self, df, num_var, num_var01, train=True):
+    def _process_numerical(self, data, num_var, num_var01, train=True):
         """Обработка количественных переменных"""
-        return None
+        file_for_params = 'numerical_params.json'
 
-    def _process_nominal(self, df, cat_var, cat_bin_var, train=True):
+        if train:
+            params = {'percentile': {}}
+            self._scaler = StandardScaler()
+        else:
+            params = load_params(file_for_params)
+            self._load_scaler()
+
+        # Предобработка количественных переменных с нефиксированной областью значения
+        for nv in data[num_var]:
+            if train:
+                dlimit = np.percentile(data[nv].values, 1)
+                ulimit = np.percentile(data[nv].values, 99)
+                params['percentile'][nv] = (dlimit, ulimit)
+            else:
+                dlimit = params['percentile'][nv][0]
+                ulimit = params['percentile'][nv][1]
+
+            data.loc[data[nv] > ulimit, nv] = ulimit
+            data.loc[data[nv] < dlimit, nv] = dlimit
+
+        save_params(file_for_params, params)
+
+        # Логарифмирование
+        for nv in data[num_var]:
+            # Обработка значений меньших единицы
+            data.loc[data[nv] < 1, nv] = 1
+            data.loc[:, nv] = np.log(data[nv])
+
+        # Шкалирование и центрирование
+        if train:
+            data.loc[:, num_var] = self._scaler.fit_transform(data[num_var])
+            self._save_scaler()
+        else:
+            data.loc[:, num_var] = self.scaler.transform(data[num_var])
+
+        return data
+
+    def _process_nominal(self, data, cat_var, cat_bin_var, train=True):
         """Обработка номинальных переменных"""
-        return None
+        file_for_params = 'categorical_params.json'
+
+        print('NEW' in data['okpd2'].values)
+
+        if train:
+            params = {
+                'grouping': {},  # Значения параметров, подлежащие группировке
+                'woe': {}  # Значения параметров и соответствующая им WoE кодировка
+            }
+
+            # Группировка редких значений
+            for cv in cat_var:
+                params['grouping'][cv] = []
+                cnt = data[cv].value_counts()
+                for val, count in zip(cnt.index, cnt.values):
+                    # Если значение встречается в менее 5% случаев
+                    if count / data.shape[0] <= 0.005:
+                        params['grouping'][cv].append(val)
+                        data.loc[data[cv] == val, cv] = 'NEW'
+
+            # WoE кодировка
+            for cv in cat_var:
+                cnt = data[cv].value_counts()
+                params['woe'][cv] = {}
+                for val, count in zip(cnt.index, cnt.values):
+                    good_with_val = data.loc[(data.cntr_result == 1) & (data[cv] == val)].shape[0]
+                    bad_with_val = data.loc[(data.cntr_result == 0) & (data[cv] == val)].shape[0]
+
+                    p = good_with_val / data.loc[data.cntr_result == 1].shape[0]
+                    q = bad_with_val / data.loc[data.cntr_result == 0].shape[0]
+                    woe = round(np.log(p / q), 3)
+
+                    params['woe'][cv][val] = woe
+                    data.loc[data[cv] == val, cv] = woe
+
+            save_params(file_for_params, params)
+        else:
+            params = load_params(file_for_params)
+            for cv in cat_var:
+                # Группировка
+                data[cv] = data[cv].replace(params['grouping'][cv], 'NEW')
+                # WoE кодирование
+                data.loc[:, cv] = data[cv].map(params['woe'][cv])
+                # Кодировка для сгруппированной переменной NEW
+                new_woe_code = params['woe'][cv].get('NEW', None)
+                if new_woe_code:
+                    # Замена неизвестных значений кодом для переменной NEW
+                    data.loc[:, cv] = data[cv].fillna(new_woe_code)
+                else:
+                    # Замена средним значением кода для этой переменной
+                    avg_woe = np.average(data[data[cv].notnull()][cv])
+                    data[cv] = data[cv].fillna(avg_woe)
+
+        return data
 
 
 def grouped_initial_vars():
@@ -184,7 +275,7 @@ def delete_useless_vars(num_var, num_var01, cat_var, cat_bin_var):
     cat_bin_var.clear()
 
 
-def load_json_from_file(filename: str):
+def load_params(filename: str):
     """Считывание JSON из файла"""
     try:
         with open(filename, 'r', encoding='utf-8') as file:
@@ -193,10 +284,10 @@ def load_json_from_file(filename: str):
         logging.error(e)
 
 
-def save_json_to_file(filename: str, data: dict):
+def save_params(filename: str, data: dict):
     """Запись JSON в файла"""
     with open(filename, 'w', encoding='utf-8') as file:
-        return file.write(json.dump(data))
+        return file.write(json.dumps(data))
 
 
 def get_data():
