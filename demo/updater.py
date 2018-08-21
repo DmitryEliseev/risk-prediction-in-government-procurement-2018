@@ -7,17 +7,30 @@
 
 import time
 import schedule
+import threading
+
+import logging
+import logging.config
 
 from demo.db import update_predictions
 from demo.db import get_sample_for_prediction
 from demo.model import CntrClassifier
+from demo.model import train_and_save_model
 from demo.config import config
+
+logging.config.fileConfig('log_config.ini')
+logger = logging.getLogger('myLogger')
+
+
+def run_threaded(job_func):
+    """Функция для обработки случая однорвеменного апдейта модели и предсказаний"""
+
+    job_thread = threading.Thread(target=job_func)
+    job_thread.start()
 
 
 def update_predictions():
-    """
-    Регулярное обновление предсказаний
-    """
+    """Регулярное обновление предсказаний"""
 
     try:
         model = CntrClassifier(train=False)
@@ -27,11 +40,27 @@ def update_predictions():
         update_predictions(predictions)
     # TODO: Определить Exception
     except Exception as e:
-        # TODO: Логгирование
-        print(e)
+        logger.error(e)
 
 
-schedule.every().day.at(config['model']['update_time']).do(update_predictions)
+def retrain_model():
+    """Регулярное обновление модели"""
+
+    try:
+        train_and_save_model()
+    # TODO: Определить Exception
+    except Exception as e:
+        logger.error(e)
+
+
+UPDATE_TIME = config['model']['update_time']
+RETRAIN_PERIOD = int(config['model']['retrain_period'])
+
+# Установка периодичности и времени переобучения (обновления) модели
+schedule.every(RETRAIN_PERIOD).days.at(UPDATE_TIME).do(run_threaded, retrain_model)
+
+# Установка времени обновления предсказаний
+schedule.every().day.at(UPDATE_TIME).do(run_threaded, update_predictions)
 
 while True:
     schedule.run_pending()
