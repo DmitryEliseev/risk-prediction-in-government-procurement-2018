@@ -12,7 +12,7 @@ import threading
 import logging
 import logging.config
 
-from demo.db import update_predictions
+from demo.db import update_predictions as update
 from demo.db import get_sample_for_prediction
 from demo.model import CntrClassifier
 from demo.model import train_and_save_model
@@ -37,7 +37,7 @@ def update_predictions():
 
         data = get_sample_for_prediction()
         predictions = model.predict_proba(data)
-        update_predictions(predictions)
+        update(predictions)
     # TODO: Определить Exception
     except Exception as e:
         logger.error(e)
