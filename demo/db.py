@@ -6,10 +6,17 @@
 """
 
 # TODO: вместо cx_Oracle использовать sqlalchemy
+
+import logging
+import logging.config
+
 import cx_Oracle
 from demo.config import config
 
 conf = config['database']
+
+logging.config.fileConfig('log_config.ini')
+logger = logging.getLogger('myLogger')
 
 
 class Oracle:
@@ -29,8 +36,7 @@ class Oracle:
             # Количество строк, считываемых за раз: https://cx-oracle.readthedocs.io/en/latest/cursor.html
             self.cursor.arraysize = 10000
         except cx_Oracle.DatabaseError as e:
-            print('Database connection error: {}'.format(e))
-            # TODO: Логгирование
+            logger.error('Database connection error: {}'.format(e))
             raise
 
     def disconnect(self):
@@ -44,7 +50,7 @@ class Oracle:
         try:
             self.cursor.execute(sql, bindvars)
         except cx_Oracle.DatabaseError as e:
-            # TODO: Логгирование
+            logger.error('Database connection error: {}'.format(e))
             raise
 
         if commit:
