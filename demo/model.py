@@ -18,6 +18,8 @@ import pandas as pd
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import cross_validate
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, roc_auc_score, log_loss
 
 from demo.db import get_train_sample
 from demo.config import config
@@ -26,6 +28,7 @@ RANDOM_SEED = 42
 
 logging.config.fileConfig('log_config.ini')
 logger = logging.getLogger('myLogger')
+
 
 # if logger.handlers:
 #     logger.handlers.clear()
@@ -111,7 +114,8 @@ class CntrClassifier:
         with open('scaler.pkl', 'wb') as file:
             pickle.dump(self._scaler, file)
 
-    def assess_model_quality(self, kfold=10):
+    def assess_model_quality_cv(self, kfold=10):
+        """Оценка качества модели на кросс-валидации"""
         data = get_data()
 
         X, y = self._prepocess_data(data)
@@ -125,6 +129,35 @@ class CntrClassifier:
             key, np.mean(scores[key]), np.std(scores[key])) for key in metric_keys)
 
         logger.info(log_str)
+
+    def assess_model_quality_train_test_split(self, test_size=0.25):
+        """Оценка качества модели на отложенной выборке"""
+        data = get_data()
+
+        train_data, test_data = train_test_split(data, random_state=RANDOM_SEED, test_size=test_size)
+
+        # TODO: Подумать, как это сделать более аккуратно (X_train -> train = false)
+        X_train, y_train = self._prepocess_data(train_data, train=False)
+        X_test, y_test = self._prepocess_data(test_data, train=False)
+
+        baseline_model = self._model
+
+        baseline_model.fit(X_train, y_train)
+
+        # Вероятность принадлежности классу 1
+        y_hat_proba = baseline_model.predict_proba(X_test)[:, 1]
+        y_hat_class = baseline_model.predict(X_test)
+
+        # Интересующие метрики качества
+        accuracy = round(accuracy_score(y_test, y_hat_class), 3)
+        roc_auc = round(roc_auc_score(y_test, y_hat_proba), 3)
+        neg_log_loss = round(-log_loss(y_test, y_hat_proba), 3)
+
+        logger.info(
+            'test_accuracy = ' + str(accuracy) + ',' \
+            + ' test_roc_auc = ' + str(roc_auc) + ',' \
+            + ' test_neg_log_loss = ' + str(neg_log_loss)
+        )
 
     def _prepocess_data(self, data, train=True):
         """Предобработка данных"""
@@ -218,7 +251,7 @@ class CntrClassifier:
                 params['grouping'][cv] = []
                 cnt = data[cv].value_counts()
                 for val, count in zip(cnt.index, cnt.values):
-                    # Если значение встречается в менее 5% случаев
+                    # Если значение встречается в менее 0.5% случаев
                     if count / data.shape[0] <= 0.005:
                         params['grouping'][cv].append(val)
                         data.loc[data[cv] == val, cv] = 'NEW'
@@ -243,20 +276,22 @@ class CntrClassifier:
             params = load_params(self._categorical_params_file)
             for cv in cat_var:
                 # Группировка
-                data[cv] = data[cv].replace(params['grouping'][cv], 'NEW')
+                if params['grouping'][cv]:
+                    data[cv] = data[cv].replace(params['grouping'][cv], 'NEW')
 
                 # WoE кодирование
-                data[cv] = data[cv].map(params['woe'][cv])
+                data[cv] = data[cv].astype(str).map(params['woe'][cv])
 
-                # Кодировка для сгруппированной переменной NEW
-                new_woe_code = params['woe'][cv].get('NEW', None)
-                if new_woe_code:
-                    # Замена неизвестных значений кодом для переменной NEW
-                    data[cv] = data[cv].fillna(new_woe_code)
-                else:
-                    # Замена средним значением кода для этой переменной
-                    avg_woe = np.average(data[data[cv].notnull()][cv])
-                    data[cv] = data[cv].fillna(avg_woe)
+                # Обработка случая, когда в тестовой выборке есть значения переменной,
+                # которые не встречались в тренировочной
+                if np.sum(data[cv].isnull()) > 0:
+                    # Кодировка для сгруппированной переменной NEW
+                    new_woe_code = params['woe'][cv].get('NEW', None)
+                    if new_woe_code:
+                        # Замена неизвестных значений кодом для переменной NEW
+                        data[cv] = data[cv].fillna(new_woe_code)
+                    else:
+                        data[cv] = data[cv].fillna(0)
 
         return data
 
