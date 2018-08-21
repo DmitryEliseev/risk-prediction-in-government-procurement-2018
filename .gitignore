@@ -18,7 +18,6 @@ web-app/setting.ini
 web-app/.idea
 web-app/__pycache__
 
-demo/setting.ini
 demo/.idea
 demo/__pycache__
 
