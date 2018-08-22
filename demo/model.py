@@ -11,6 +11,7 @@ import logging.config
 # import demo.logs_helper
 import pickle
 import json
+import os
 
 import numpy as np
 import pandas as pd
@@ -96,10 +97,10 @@ class CntrClassifier:
         except FileNotFoundError as e:
             logger.error(e)
 
-    def _load_scaler(self):
+    def _load_scaler(self, assess=''):
         """Загрузка нормализатора"""
         try:
-            with open('scaler.pkl', 'rb') as file:
+            with open(assess + 'scaler.pkl', 'rb') as file:
                 self._scaler = pickle.load(file)
         except FileNotFoundError as e:
             logger.error(e)
@@ -109,9 +110,9 @@ class CntrClassifier:
         with open('model.pkl', 'wb') as file:
             pickle.dump(self._model, file)
 
-    def _save_scaler(self):
+    def _save_scaler(self, assess=''):
         """Экспорт нормализатора"""
-        with open('scaler.pkl', 'wb') as file:
+        with open(assess + 'scaler.pkl', 'wb') as file:
             pickle.dump(self._scaler, file)
 
     def assess_model_quality_cv(self, kfold=10):
@@ -137,8 +138,13 @@ class CntrClassifier:
         train_data, test_data = train_test_split(data, random_state=RANDOM_SEED, test_size=test_size)
 
         # TODO: Подумать, как это сделать более аккуратно (X_train -> train = false)
-        X_train, y_train = self._prepocess_data(train_data, train=False)
-        X_test, y_test = self._prepocess_data(test_data, train=False)
+        X_train, y_train = self._prepocess_data(train_data, train=True, assess='split_')
+        X_test, y_test = self._prepocess_data(test_data, train=False, assess='split_')
+
+        # Удаление ненужных файлов
+        os.remove("split_categorical_params.json")
+        os.remove("split_numerical_params.json")
+        os.remove("split_scaler.pkl")
 
         baseline_model = self._model
 
@@ -159,14 +165,14 @@ class CntrClassifier:
             + ' test_neg_log_loss = ' + str(neg_log_loss)
         )
 
-    def _prepocess_data(self, data, train=True):
+    def _prepocess_data(self, data, train=True, assess=''):
         """Предобработка данных"""
 
         num_var, num_var01, cat_var, cat_bin_var = grouped_initial_vars()
         delete_useless_vars(num_var, num_var01, cat_var, cat_bin_var)
 
-        data = self._process_numerical(data, num_var, num_var01, train=train)
-        data = self._process_nominal(data, cat_var, cat_bin_var, train=train)
+        data = self._process_numerical(data, num_var, num_var01, train=train, assess=assess)
+        data = self._process_nominal(data, cat_var, cat_bin_var, train=train, assess=assess)
 
         data = data[num_var + num_var01 + cat_var + cat_bin_var + ['cntr_result']]
 
@@ -199,14 +205,14 @@ class CntrClassifier:
 
         return data
 
-    def _process_numerical(self, data, num_var, num_var01, train=True):
+    def _process_numerical(self, data, num_var, num_var01, train=True, assess='', ):
         """Обработка количественных переменных"""
         if train:
             params = {'percentile': {}}
             self._scaler = StandardScaler()
         else:
-            params = load_params(self._numerical_params_file)
-            self._load_scaler()
+            params = load_params(assess + self._numerical_params_file)
+            self._load_scaler(assess)
 
         # Предобработка количественных переменных с нефиксированной областью значения
         for nv in data[num_var]:
@@ -221,7 +227,7 @@ class CntrClassifier:
             data.loc[data[nv] > ulimit, nv] = ulimit
             data.loc[data[nv] < dlimit, nv] = dlimit
 
-        save_params(self._numerical_params_file, params)
+        save_params(assess + self._numerical_params_file, params)
 
         # Логарифмирование
         for nv in data[num_var]:
@@ -232,13 +238,13 @@ class CntrClassifier:
         # Шкалирование и центрирование
         if train:
             data.loc[:, num_var] = self._scaler.fit_transform(data[num_var])
-            self._save_scaler()
+            self._save_scaler(assess)
         else:
             data.loc[:, num_var] = self._scaler.transform(data[num_var])
 
         return data
 
-    def _process_nominal(self, data, cat_var, cat_bin_var, train=True):
+    def _process_nominal(self, data, cat_var, cat_bin_var, train=True, assess=''):
         """Обработка номинальных переменных"""
         if train:
             params = {
@@ -271,9 +277,9 @@ class CntrClassifier:
                     params['woe'][cv][val] = woe
                     data.loc[data[cv] == val, cv] = woe
 
-            save_params(self._categorical_params_file, params)
+            save_params(assess + self._categorical_params_file, params)
         else:
-            params = load_params(self._categorical_params_file)
+            params = load_params(assess + self._categorical_params_file)
             for cv in cat_var:
                 # Группировка
                 if params['grouping'][cv]:
