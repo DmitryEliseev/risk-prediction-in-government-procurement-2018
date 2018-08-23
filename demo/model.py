@@ -18,9 +18,11 @@ import pandas as pd
 
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import cross_validate
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import accuracy_score, roc_auc_score, log_loss
+
+from time import time
 
 from demo.db import get_train_sample
 from demo.config import config
@@ -45,7 +47,6 @@ class CntrClassifier:
         if train:
             self.train()
             self.save()
-            self.assess_model_quality_train_test_split()
         else:
             self.load()
 
@@ -116,38 +117,119 @@ class CntrClassifier:
         with open(prefix + 'scaler.pkl', 'wb') as file:
             pickle.dump(self._scaler, file)
 
-    def assess_model_quality_cv(self, kfold=10):
+    def cross_validate(self, model, data, scoring, cv=10, return_train_score=False):
+        """Кросс-валидация с учетом переподсчета WoE, перцентилей и др."""
+        PREFIX = 'cv_'
+        scores = {}
+        types = ('train_', 'test_')
+        scores['fit_time'] = []
+
+        for type in types:
+            if type == 'train_':
+                if not return_train_score:
+                    continue
+            for metric in scoring:
+                scores[type + metric] = []
+
+        X, y = data.values, data.cntr_result.values
+        skf = StratifiedKFold(n_splits=cv, random_state=RANDOM_SEED)
+        skf.get_n_splits(X, y)
+
+        for train_index, test_index in skf.split(X, y):
+            data_train, data_test = data.loc[train_index], data.loc[test_index]
+
+            X_train, y_train = self._prepocess_data(data_train, train=True, prefix=PREFIX)
+            X_test, y_test = self._prepocess_data(data_test, train=False, prefix=PREFIX)
+
+            # Удаление ненужных файлов
+            try:
+                for file in (
+                        PREFIX + self._categorical_params_file,
+                        PREFIX + self._numerical_params_file,
+                        PREFIX + 'scaler.pkl'
+                ):
+                    os.remove(file)
+            except FileNotFoundError as e:
+                logger.error(e)
+
+            start_time = time()
+            model.fit(X_train, y_train)
+            end_time = time()
+            scores['fit_time'].append(end_time - start_time)
+
+            for type in types:
+                if type == 'train_':
+                    y_true = y_train
+                    X = X_train
+
+                    if not return_train_score:
+                        continue
+
+                else:
+                    y_true = y_test
+                    X = X_test
+
+                for metric in scoring:
+                    score = 0
+                    if metric == 'accuracy':
+                        y_hat = model.predict(X)
+                    else:
+                        y_hat = model.predict_proba(X)[:, 1]
+
+                    if metric == 'roc_auc':
+                        score = roc_auc_score(y_true, y_hat)
+                    elif metric == 'neg_log_loss':
+                        score = -log_loss(y_true, y_hat)
+                    else:
+                        score = accuracy_score(y_true, y_hat)
+
+                    scores[type + metric].append(score)
+        return scores
+
+    def assess_model_quality_cv(self, kfold=10, return_train_score=True):
         """Оценка качества модели на кросс-валидации"""
+
+        logger.info('Тестирование на кросс-валидации: K = %s' % kfold)
         data = get_data()
 
-        X, y = self._prepocess_data(data)
-
         metrics = ('roc_auc', 'accuracy', 'neg_log_loss')
-        scores = cross_validate(self._model, X, y, scoring=metrics, cv=kfold, return_train_score=True)
+        scores = self.cross_validate(self._model, data, scoring=metrics, cv=kfold,
+                                     return_train_score=return_train_score)
 
-        metric_keys = ['train_{}'.format(metric) for metric in metrics]
+        metric_keys = []
+
+        if return_train_score:
+            metric_keys.extend(['train_{}'.format(metric) for metric in metrics])
+
         metric_keys.extend(['test_{}'.format(metric) for metric in metrics])
-        log_str = ', '.join('{}: M: {} STD: {}'.format(
+        log_str = ', '.join('{}: M: {:.3f} STD: {:.3f}'.format(
             key, np.mean(scores[key]), np.std(scores[key])) for key in metric_keys)
+
+        log_str += ', {}: M: {:.3f} STD: {:.3f}'.format(
+            'fit_time', np.mean(scores['fit_time']), np.std(scores['fit_time'])
+        )
 
         logger.info(log_str)
 
     def assess_model_quality_train_test_split(self, test_size=0.25):
         """Оценка качества модели на отложенной выборке"""
+
+        logger.info('Тестирование на отложенной выборке ({})'.format(test_size))
+
         data = get_data()
 
         train_data, test_data = train_test_split(data, random_state=RANDOM_SEED, test_size=test_size)
 
-        prefix = 'split_'
-        X_train, y_train = self._prepocess_data(train_data, train=True, prefix=prefix)
-        X_test, y_test = self._prepocess_data(test_data, train=False, prefix=prefix)
+        PREFIX = 'split_'
+        X_train, y_train = self._prepocess_data(train_data, train=True, prefix=PREFIX)
+        X_test, y_test = self._prepocess_data(test_data, train=False, prefix=PREFIX)
 
         # Удаление ненужных файлов
         try:
             for file in (
-                    prefix + self._categorical_params_file,
-                    prefix + self._numerical_params_file,
-                    prefix + 'scaler.pkl'
+                    PREFIX + self._categorical_params_file,
+                    PREFIX + self._numerical_params_file,
+                    PREFIX + 'scaler.pkl'
             ):
                 os.remove(file)
         except FileNotFoundError as e:
