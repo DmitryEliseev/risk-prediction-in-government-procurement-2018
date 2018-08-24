@@ -11,7 +11,7 @@ import logging
 import logging.config
 
 import cx_Oracle
-from demo.config import config
+from config import config
 
 conf = config['database']
 

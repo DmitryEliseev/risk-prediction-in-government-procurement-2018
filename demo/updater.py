@@ -12,11 +12,11 @@ import threading
 import logging
 import logging.config
 
-from demo.db import update_predictions as update
-from demo.db import get_sample_for_prediction
-from demo.model import CntrClassifier
-from demo.model import train_and_save_model
-from demo.config import config
+from db import update_predictions as update
+from db import get_sample_for_prediction
+from model import CntrClassifier
+from model import train_and_save_model
+from config import config
 
 logging.config.fileConfig('log_config.ini')
 logger = logging.getLogger('myLogger')

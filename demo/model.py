@@ -12,6 +12,9 @@ import logging.config
 import pickle
 import json
 import os
+import argparse
+import warnings
+warnings.filterwarnings('ignore')
 
 import numpy as np
 import pandas as pd
@@ -24,8 +27,8 @@ from sklearn.metrics import accuracy_score, roc_auc_score, log_loss
 
 from time import time
 
-from demo.db import get_train_sample
-from demo.config import config
+from db import get_train_sample
+from config import config
 
 RANDOM_SEED = 42
 
@@ -473,7 +476,60 @@ def predict(data):
     return clf.predict_proba(data)
 
 
+def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '--test',
+        help='Принимает единственный аргумент. '
+                'Если 1 или double, то модель тестируется на отложенной выборке. '
+                'Если целое число, то модель тестируется на SK-fold cross-validation.',
+        nargs=1
+    )
+
+    parser.add_argument(
+        '--train',
+        help='Обучает модель на всей доступной выборке.',
+        action='store_true'
+    )
+
+    args = parser.parse_args()
+
+    if args.train:
+        logger.info('Начато обучение модели')
+        train_and_save_model()
+        logger.info('Закончено тестирование модели')
+
+    if args.test:
+        logger.info('Начато тестирование модели')
+
+        def isFloat(num: str):
+            try:
+                float(num)
+                return True
+            except ValueError:
+                return False
+
+
+
+        if '.' in args.test[0] or args.test[0] == '1':
+            if args.test[0] == '1':
+                CntrClassifier(train=False).assess_model_quality_train_test_split()
+            else:
+                if not isFloat(args.test[0]):
+                    raise ValueError('Неверный тип, должен быть вида: 0.f')
+                CntrClassifier(train=False).assess_model_quality_train_test_split(test_size=float(args.test[0]))
+        else:
+            CntrClassifier(train=False).assess_model_quality_cv(kfold=int(args.test[0]))
+
+        logger.info('Закончено тестирование модели')
+
+
 if __name__ == '__main__':
-    logger.info('Начато обучение модели')
-    train_and_save_model()
-    logger.info('Закончено обучение модели')
+    # logger.info('Начато обучение модели')
+    # train_and_save_model()
+    # logger.info('Закончено обучение модели')
+    main()
+
+# train_roc_auc: M: 0.993 STD: 0.000, train_accuracy: M: 0.958 STD: 0.001, train_neg_log_loss: M: -0.113 STD: 0.001, test_roc_auc: M: 0.980 STD: 0.003, test_accuracy: M: 0.925 STD: 0.006, test_neg_log_loss: M: -0.167 STD: 0.011, fit_time: M: 19.135 STD: 0.854
+# max_depth = 7, subsample = 0.85
