@@ -14,6 +14,7 @@ import json
 import os
 import argparse
 import warnings
+
 warnings.filterwarnings('ignore')
 
 import numpy as np
@@ -482,8 +483,8 @@ def main():
     parser.add_argument(
         '--test',
         help='Принимает единственный аргумент. '
-                'Если 1 или double, то модель тестируется на отложенной выборке. '
-                'Если целое число, то модель тестируется на SK-fold cross-validation.',
+             'Если 1 или double, то модель тестируется на отложенной выборке. '
+             'Если целое число, то модель тестируется на SK-fold cross-validation.',
         nargs=1
     )
 
@@ -510,8 +511,6 @@ def main():
             except ValueError:
                 return False
 
-
-
         if '.' in args.test[0] or args.test[0] == '1':
             if args.test[0] == '1':
                 CntrClassifier(train=False).assess_model_quality_train_test_split()
@@ -526,9 +525,9 @@ def main():
 
 
 if __name__ == '__main__':
-    # logger.info('Начато обучение модели')
-    # train_and_save_model()
-    # logger.info('Закончено обучение модели')
+    logger.info('Начато обучение модели')
+    train_and_save_model()
+    logger.info('Закончено обучение модели')
     main()
 
 # train_roc_auc: M: 0.993 STD: 0.000, train_accuracy: M: 0.958 STD: 0.001, train_neg_log_loss: M: -0.113 STD: 0.001, test_roc_auc: M: 0.980 STD: 0.003, test_accuracy: M: 0.925 STD: 0.006, test_neg_log_loss: M: -0.167 STD: 0.011, fit_time: M: 19.135 STD: 0.854
