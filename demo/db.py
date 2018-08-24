@@ -63,7 +63,7 @@ def get_train_sample():
     """Сбор тренировочной выборки"""
 
     oracle = Oracle()
-    oracle.connect(conf['username'], conf['password'], conf['hostname'], conf['port'], conf['service_name'])
+    oracle.connect(conf['username'], conf['pwd'], conf['host'], conf['port'], conf['service_name'])
 
     # Выбор всех данных для тренировочной выборки
     sql_statement = 'SELECT * FROM train_sample'
@@ -82,7 +82,7 @@ def get_sample_for_prediction():
     """Сбор выборки для построения предсказаний"""
 
     oracle = Oracle.connect(
-        conf['username'], conf['password'], conf['hostname'], conf['port'], conf['service_name']
+        conf['username'], conf['pwd'], conf['host'], conf['port'], conf['service_name']
     )
 
     # Выбор всех данных для тренировочной выборки
