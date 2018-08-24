@@ -1,3 +1,6 @@
-cx_Oracle == 6.4.1
-pandas == 0.23.0
-schedule == 0.5.0
+schedule==0.5.0
+numpy==1.15.0
+pandas==0.23.0
+SQLAlchemy==1.2.10
+cx_Oracle==6.4.1
+scikit_learn==0.19.2
