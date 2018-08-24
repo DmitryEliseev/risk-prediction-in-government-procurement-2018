@@ -8,4 +8,4 @@
 import configparser
 
 config = configparser.ConfigParser()
-config.read('sys_config.ini')
+config.read('sys_config.ini', encoding='UTF8')
