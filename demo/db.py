@@ -5,94 +5,96 @@
 Работа с БД
 """
 
-# TODO: вместо cx_Oracle использовать sqlalchemy
-
 import logging
 import logging.config
 
-import cx_Oracle
-from config import config
+import pandas as pd
 
-db_conf = config['database']
+import cx_Oracle
+from sqlalchemy import create_engine, exc
+
+from config import config
 
 logging.config.fileConfig('log_config.ini')
 logger = logging.getLogger('myLogger')
 
+db_conf = config['database']
+
 
 class Oracle:
+    """Класс для работы с Oracle БД"""
+
     def __init__(self):
-        self.db = None
-        self.cursor = None
+        self.engine = None
+        self.con_string = 'oracle+cx_oracle://{user}:{pwd}'
+        self.connect()
 
-    def connect(self, username, password, hostname, port, service_name):
-        try:
-            self.db = cx_Oracle.connect(
-                username,
-                password,
-                '{}:{}/{}'.format(hostname, port, service_name)
+    def connect(self):
+        """Подключение к БД"""
+
+        username = db_conf['username']
+        pwd = db_conf['pwd']
+        host = db_conf['host']
+        port = db_conf['port']
+        db_name = db_conf['db_name']
+        service_name = db_conf['service_name']
+
+        if db_name and service_name:
+            logger.warning(
+                'В файле конфигурации указан SID и имя сервиса. '
+                'Подсоединение произодет по SID'
             )
-            self.cursor = self.db.cursor()
 
-            # Количество строк, считываемых за раз: https://cx-oracle.readthedocs.io/en/latest/cursor.html
-            self.cursor.arraysize = 10000
-        except cx_Oracle.DatabaseError as e:
-            logger.error('Database connection error: {}'.format(e))
-            raise
+        if db_name:
+            self.connect_with_sid(username, pwd, host, port, db_name)
+        else:
+            self.connect_with_service_name(username, pwd, host, port, service_name)
 
-    def disconnect(self):
-        try:
-            self.cursor.close()
-            self.db.close()
-        except cx_Oracle.DatabaseError:
-            pass
+    def connect_with_sid(self, username, password, host, port, sid):
+        """Подключение к БД с помощью SID"""
 
-    def execute(self, sql, bindvars=None, commit=False):
-        try:
-            self.cursor.execute(sql, bindvars)
-        except cx_Oracle.DatabaseError as e:
-            logger.error('Database connection error: {}'.format(e))
-            raise
+        connection_str = (self.con_string + '@{sid}').format(
+            user=username,
+            pwd=password,
+            sid=cx_Oracle.makedsn(host, port, sid)
+        )
 
-        if commit:
-            self.db.commit()
+        self.engine = create_engine(connection_str, echo=True)
 
-        return self.cursor
+    def connect_with_service_name(self, username, password, host, port, service_name):
+        """Подключение к БД с помощью названия службы"""
+
+        connection_str = (self.con_string + '@{service_name}').format(
+            user=username,
+            pwd=password,
+            service_name=cx_Oracle.makedsn(host, port, service_name=service_name)
+        )
+
+        self.engine = create_engine(connection_str, echo=True)
 
 
 def get_train_sample():
     """Сбор тренировочной выборки"""
 
     oracle = Oracle()
-    oracle.connect(db_conf['username'], db_conf['pwd'], db_conf['host'], db_conf['port'], db_conf['service_name'])
-
-    # Выбор всех данных для тренировочной выборки
-    sql_statement = 'SELECT * FROM train_sample'
-
-    # ora_conn = cx_Oracle.connect('your_connection_string')
-    # df_ora = pd.read_sql('select * from user_objects', con=ora_conn)
-
     try:
-        cursor = oracle.execute(sql_statement)
-        return cursor.fetchall()
-    finally:
-        oracle.disconnect()
+        data = pd.read_sql_query('SELECT * FROM train_sample', oracle.engine, index_col='ID')
+        return data
+    except exc.DatabaseError as e:
+        logger.error('Ошибка подключения к БД: {}'.format(e))
+        exit(1)
 
 
 def get_sample_for_prediction():
     """Сбор выборки для построения предсказаний"""
 
-    oracle = Oracle.connect(
-        db_conf['username'], db_conf['pwd'], db_conf['host'], db_conf['port'], db_conf['service_name']
-    )
-
-    # Выбор всех данных для тренировочной выборки
-    sql_statement = 'SELECT * FROM not_finished_cntr'
-
+    oracle = Oracle()
     try:
-        cursor = oracle.execute(sql_statement)
-        return cursor.fetchall()
-    finally:
-        oracle.disconnect()
+        data = pd.read_sql_query('SELECT * FROM not_finished_cntr', oracle.engine, index_col='ID')
+        return data
+    except exc.DatabaseError as e:
+        logger.error('Ошибка подключения к БД: {}'.format(e))
+        exit(1)
 
 
 def update_predictions():
