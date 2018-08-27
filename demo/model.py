@@ -8,14 +8,13 @@
 import logging
 import logging.config
 
-# import demo.logs_helper
 import pickle
 import json
 import os
 import argparse
 import warnings
-
-warnings.filterwarnings('ignore')
+import copy
+import time
 
 import numpy as np
 import pandas as pd
@@ -26,10 +25,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import accuracy_score, roc_auc_score, log_loss
 
-from time import time
-
 from db import get_train_sample
 from config import config
+
+warnings.filterwarnings('ignore')
 
 RANDOM_SEED = 42
 
@@ -37,6 +36,31 @@ logging.config.fileConfig('log_config.ini')
 logger = logging.getLogger('myLogger')
 
 model_conf = config['model']
+
+
+def stopwatch(level):
+    """Декоратор для измерения времени выполнения функций"""
+
+    def proc(func):
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            func_result = func(*args, **kwargs)
+            time_spent = time.time() - start_time
+
+            log_str = 'Выполнение функции {} заняло {:.2f} сек'.format(
+                func.__name__, time_spent
+            )
+
+            if level == 'info':
+                logger.info(log_str)
+            else:
+                logger.debug(log_str)
+
+            return func_result
+
+        return wrapper
+
+    return proc
 
 
 class CntrClassifier:
@@ -135,15 +159,15 @@ class CntrClassifier:
 
         PREFIX = 'cv_'
         scores = {}
-        types = ('train_', 'test_')
+        aliases = ('train_', 'test_')
         scores['fit_time'] = []
 
-        for type in types:
-            if type == 'train_':
+        for alias in aliases:
+            if alias == 'train_':
                 if not return_train_score:
                     continue
             for metric in scoring:
-                scores[type + metric] = []
+                scores[alias + metric] = []
 
         X, y = data.values, data.cntr_result.values
         skf = StratifiedKFold(n_splits=cv, random_state=RANDOM_SEED)
@@ -155,24 +179,15 @@ class CntrClassifier:
             X_train, y_train = self._prepocess_data(data_train, train=True, prefix=PREFIX)
             X_test, y_test = self._prepocess_data(data_test, train=False, prefix=PREFIX)
 
-            # Удаление ненужных файлов
-            try:
-                for file in (
-                            PREFIX + self._categorical_params_file,
-                            PREFIX + self._numerical_params_file,
-                            PREFIX + 'scaler.pkl'
-                ):
-                    os.remove(file)
-            except FileNotFoundError as e:
-                logger.error(e)
+            self._delete_train_files(PREFIX)
 
-            start_time = time()
+            start_time = time.time()
             model.fit(X_train, y_train)
-            end_time = time()
+            end_time = time.time()
             scores['fit_time'].append(end_time - start_time)
 
-            for type in types:
-                if type == 'train_':
+            for alias in aliases:
+                if alias == 'train_':
                     y_true = y_train
                     X = X_train
 
@@ -197,9 +212,10 @@ class CntrClassifier:
                     else:
                         score = accuracy_score(y_true, y_hat)
 
-                    scores[type + metric].append(score)
+                    scores[alias + metric].append(score)
         return scores
 
+    @stopwatch(level='debug')
     def assess_model_quality_cv(self, kfold=10, return_train_score=True):
         """Оценка качества модели на кросс-валидации"""
 
@@ -207,8 +223,10 @@ class CntrClassifier:
         data = get_data()
 
         metrics = ('roc_auc', 'accuracy', 'neg_log_loss')
-        scores = self.cross_validate(self._model, data, scoring=metrics, cv=kfold,
-                                     return_train_score=return_train_score)
+        scores = self.cross_validate(
+            self._model, data, scoring=metrics, cv=kfold,
+            return_train_score=return_train_score
+        )
 
         metric_keys = []
 
@@ -216,15 +234,18 @@ class CntrClassifier:
             metric_keys.extend(['train_{}'.format(metric) for metric in metrics])
 
         metric_keys.extend(['test_{}'.format(metric) for metric in metrics])
-        log_str = ', '.join('{}: M: {:.3f} STD: {:.3f}'.format(
-            key, np.mean(scores[key]), np.std(scores[key])) for key in metric_keys)
 
-        log_str += ', {}: M: {:.3f} STD: {:.3f}'.format(
-            'fit_time', np.mean(scores['fit_time']), np.std(scores['fit_time'])
+        cv_result = pd.DataFrame(
+            {
+                'mean': [np.mean(scores[key]) for key in metric_keys],
+                'std': [np.std(scores[key]) for key in metric_keys]
+            },
+            index=metric_keys
         )
 
-        logger.info(log_str)
+        logger.info('\n' + str(cv_result.round(3)))
 
+    @stopwatch(level='debug')
     def assess_model_quality_train_test_split(self, test_size=0.25):
         """Оценка качества модели на отложенной выборке"""
 
@@ -238,19 +259,11 @@ class CntrClassifier:
         X_train, y_train = self._prepocess_data(train_data, train=True, prefix=PREFIX)
         X_test, y_test = self._prepocess_data(test_data, train=False, prefix=PREFIX)
 
-        # Удаление ненужных файлов
-        try:
-            for file in (
-                        PREFIX + self._categorical_params_file,
-                        PREFIX + self._numerical_params_file,
-                        PREFIX + 'scaler.pkl'
-            ):
-                os.remove(file)
-        except FileNotFoundError as e:
-            logger.error(e)
+        # Удаление файлов, созданных во время тренировки модели
+        self._delete_train_files(PREFIX)
 
-        baseline_model = self._model
-
+        # Обучение модели
+        baseline_model = copy.deepcopy(self._model)
         baseline_model.fit(X_train, y_train)
 
         # Вероятность принадлежности классу 1
@@ -263,9 +276,9 @@ class CntrClassifier:
         neg_log_loss = round(-log_loss(y_test, y_hat_proba), 3)
 
         logger.info(
-            'test_accuracy = ' + str(accuracy) + ',' \
-            + ' test_roc_auc = ' + str(roc_auc) + ',' \
-            + ' test_neg_log_loss = ' + str(neg_log_loss)
+            'test_accuracy = {}, test_roc_auc = {}, test_neg_log_loss = {}'.format(
+                accuracy, roc_auc, neg_log_loss
+            )
         )
 
     def _prepocess_data(self, data, train=True, prefix=''):
@@ -413,6 +426,19 @@ class CntrClassifier:
 
         return data
 
+    def _delete_train_files(self, prefix):
+        """Удаление файлов, созданных на этапе тренировки модели"""
+
+        try:
+            for file in (
+                        prefix + self._categorical_params_file,
+                        prefix + self._numerical_params_file,
+                        prefix + 'scaler.pkl'
+            ):
+                os.remove(file)
+        except FileNotFoundError as e:
+            logger.error(e)
+
 
 def grouped_initial_vars():
     """Список сгруппированных по типу переменных"""
@@ -490,6 +516,7 @@ def get_data():
         return get_train_sample()
 
 
+@stopwatch(level='info')
 def train_and_save_model():
     """Обучение модели и сохранение параметров"""
 
