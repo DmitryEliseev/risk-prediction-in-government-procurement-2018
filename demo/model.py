@@ -36,12 +36,12 @@ RANDOM_SEED = 42
 logging.config.fileConfig('log_config.ini')
 logger = logging.getLogger('myLogger')
 
-
-# if logger.handlers:
-#     logger.handlers.clear()
+model_conf = config['model']
 
 
 class CntrClassifier:
+    """Класс для работы с моделью, предсказывающей рискованность госконтрактов"""
+
     def __init__(self, train=True):
         self._model = None
         self._scaler = None
@@ -74,6 +74,7 @@ class CntrClassifier:
         # Предобработка
         X, y = self._prepocess_data(data)
 
+        # Инициализация модели
         self._model = GradientBoostingClassifier(
             random_state=RANDOM_SEED,
             learning_rate=0.1,
@@ -82,21 +83,26 @@ class CntrClassifier:
             subsample=0.85
         )
 
+        # Обучение модели
         self._model.fit(X, y)
+
+        # Сохранение модели и скейлера
         self._save_model()
 
     def predict(self, data):
+        """Построение предсказаний"""
         X, y = self._prepocess_data(data, train=False)
         return self._model.predict(X, y)
 
     def predict_proba(self, data):
-        """Построение предсказаний"""
+        """Построение вероятностных предсказаний"""
 
         X, y = self._prepocess_data(data, train=False)
         return self._model.predict_proba(X, y)
 
     def _load_model(self):
         """Загрузка обученной модели"""
+
         try:
             with open('model.pkl', 'rb') as file:
                 self._model = pickle.load(file)
@@ -105,6 +111,7 @@ class CntrClassifier:
 
     def _load_scaler(self, prefix=''):
         """Загрузка нормализатора"""
+
         try:
             with open(prefix + 'scaler.pkl', 'rb') as file:
                 self._scaler = pickle.load(file)
@@ -113,16 +120,19 @@ class CntrClassifier:
 
     def _save_model(self):
         """Экспорт модели"""
+
         with open('model.pkl', 'wb') as file:
             pickle.dump(self._model, file)
 
     def _save_scaler(self, prefix=''):
         """Экспорт нормализатора"""
+
         with open(prefix + 'scaler.pkl', 'wb') as file:
             pickle.dump(self._scaler, file)
 
     def cross_validate(self, model, data, scoring, cv=10, return_train_score=False):
         """Кросс-валидация с учетом переподсчета WoE, перцентилей и др."""
+
         PREFIX = 'cv_'
         scores = {}
         types = ('train_', 'test_')
@@ -148,9 +158,9 @@ class CntrClassifier:
             # Удаление ненужных файлов
             try:
                 for file in (
-                        PREFIX + self._categorical_params_file,
-                        PREFIX + self._numerical_params_file,
-                        PREFIX + 'scaler.pkl'
+                            PREFIX + self._categorical_params_file,
+                            PREFIX + self._numerical_params_file,
+                            PREFIX + 'scaler.pkl'
                 ):
                     os.remove(file)
             except FileNotFoundError as e:
@@ -231,9 +241,9 @@ class CntrClassifier:
         # Удаление ненужных файлов
         try:
             for file in (
-                    PREFIX + self._categorical_params_file,
-                    PREFIX + self._numerical_params_file,
-                    PREFIX + 'scaler.pkl'
+                        PREFIX + self._categorical_params_file,
+                        PREFIX + self._numerical_params_file,
+                        PREFIX + 'scaler.pkl'
             ):
                 os.remove(file)
         except FileNotFoundError as e:
@@ -278,7 +288,7 @@ class CntrClassifier:
     def balance_data(data, good_prop=0.7):
         """
         Балансировка выборки так, чтобы хорошие составляли
-        от общего числа контрактов долю, равную good_prop
+        от общего числа контрактов долю = good_prop
         """
         bad_cntr = data.loc[data.cntr_result == 1]
         good_cntr = data.loc[data.cntr_result == 0]
@@ -292,14 +302,22 @@ class CntrClassifier:
         )
 
         data = bad_cntr.append(good_cntr)
-        logger.info('Доля плохих на обучающей выборке: {:.2f}'.format(
-            bad_cntr.shape[0] / data.shape[0]
-        ))
+
+        logger.debug(
+            'Значение параметра "доля плохих контрактов" на обучающей выборке: {:.2f}'
+                .format(1 - good_prop)
+        )
+
+        logger.debug(
+            'Фактическая доля плохих контрактов: {:.2f}'
+                .format(bad_cntr.shape[0] / data.shape[0])
+        )
 
         return data
 
     def _process_numerical(self, data, num_var, num_var01, train=True, prefix='', ):
         """Обработка количественных переменных"""
+
         if train:
             params = {'percentile': {}}
             self._scaler = StandardScaler()
@@ -339,6 +357,7 @@ class CntrClassifier:
 
     def _process_nominal(self, data, cat_var, cat_bin_var, train=True, prefix=''):
         """Обработка номинальных переменных"""
+
         if train:
             params = {
                 'grouping': {},  # Значения параметров, подлежащие группировке
@@ -425,8 +444,7 @@ def grouped_initial_vars():
 
 def delete_useless_vars(num_var, num_var01, cat_var, cat_bin_var):
     """
-    Удаление бесмысленных переменных на основе
-    предварительного анализа данных
+    Удаление бесмысленных переменных на основе предварительного анализа данных
     """
 
     for nv in ('cntr_num_together', 'price', 'pmp'):
@@ -447,6 +465,7 @@ def delete_useless_vars(num_var, num_var01, cat_var, cat_bin_var):
 
 def load_params(filename: str):
     """Считывание JSON из файла"""
+
     try:
         with open(filename, 'r', encoding='utf-8') as file:
             return json.loads(file.read())
@@ -455,13 +474,16 @@ def load_params(filename: str):
 
 
 def save_params(filename: str, data: dict):
-    """Запись JSON в файла"""
+    """Запись JSON в файл"""
+
     with open(filename, 'w', encoding='utf-8') as file:
         return file.write(json.dumps(data))
 
 
 def get_data():
-    data_source = config['data']['source']
+    """Считывание исходных данных"""
+
+    data_source = model_conf['source']
     if data_source == 'csv':
         return pd.read_csv('../data/4/grbs_finished.csv', encoding='utf-8')
     else:
@@ -469,15 +491,12 @@ def get_data():
 
 
 def train_and_save_model():
+    """Обучение модели и сохранение параметров"""
+
     CntrClassifier()
 
 
-def predict(data):
-    clf = CntrClassifier(train=False)
-    return clf.predict_proba(data)
-
-
-def main():
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -499,36 +518,26 @@ def main():
     if args.train:
         logger.info('Начато обучение модели')
         train_and_save_model()
-        logger.info('Закончено тестирование модели')
+        logger.info('Закончено обучение модели')
 
     if args.test:
         logger.info('Начато тестирование модели')
 
-        def isFloat(num: str):
-            try:
-                float(num)
-                return True
-            except ValueError:
-                return False
+        test_arg = args.test[0]
 
-        if '.' in args.test[0] or args.test[0] == '1':
-            if args.test[0] == '1':
+        if test_arg.replace(".", "", 1).isdigit():
+            if '.' in test_arg:
+                # Тестирование на отложенной выборке с соотношением тестовой выборки равным test_arg
+                CntrClassifier(train=False).assess_model_quality_train_test_split(test_size=float(test_arg))
+            elif int(test_arg) == 1:
+                # Тестирование на отложенной выборке с соотношением обучающей и тестовой по умолчанию
                 CntrClassifier(train=False).assess_model_quality_train_test_split()
             else:
-                if not isFloat(args.test[0]):
-                    raise ValueError('Неверный тип, должен быть вида: 0.f')
-                CntrClassifier(train=False).assess_model_quality_train_test_split(test_size=float(args.test[0]))
+                # Тестирование на кросс-валидации с количеством фолдов равным test_arg
+                CntrClassifier(train=False).assess_model_quality_cv(kfold=int(test_arg))
         else:
-            CntrClassifier(train=False).assess_model_quality_cv(kfold=int(args.test[0]))
+            msg_error = 'Неверное значение аргумента --test: {}. Должен быть INT или FLOAT'.format(test_arg)
+            logger.error(msg_error)
+            raise ValueError(msg_error)
 
         logger.info('Закончено тестирование модели')
-
-
-if __name__ == '__main__':
-    logger.info('Начато обучение модели')
-    train_and_save_model()
-    logger.info('Закончено обучение модели')
-    main()
-
-# train_roc_auc: M: 0.993 STD: 0.000, train_accuracy: M: 0.958 STD: 0.001, train_neg_log_loss: M: -0.113 STD: 0.001, test_roc_auc: M: 0.980 STD: 0.003, test_accuracy: M: 0.925 STD: 0.006, test_neg_log_loss: M: -0.167 STD: 0.011, fit_time: M: 19.135 STD: 0.854
-# max_depth = 7, subsample = 0.85

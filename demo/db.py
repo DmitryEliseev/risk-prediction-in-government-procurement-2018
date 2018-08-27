@@ -13,7 +13,7 @@ import logging.config
 import cx_Oracle
 from config import config
 
-conf = config['database']
+db_conf = config['database']
 
 logging.config.fileConfig('log_config.ini')
 logger = logging.getLogger('myLogger')
@@ -63,7 +63,7 @@ def get_train_sample():
     """Сбор тренировочной выборки"""
 
     oracle = Oracle()
-    oracle.connect(conf['username'], conf['pwd'], conf['host'], conf['port'], conf['service_name'])
+    oracle.connect(db_conf['username'], db_conf['pwd'], db_conf['host'], db_conf['port'], db_conf['service_name'])
 
     # Выбор всех данных для тренировочной выборки
     sql_statement = 'SELECT * FROM train_sample'
@@ -82,7 +82,7 @@ def get_sample_for_prediction():
     """Сбор выборки для построения предсказаний"""
 
     oracle = Oracle.connect(
-        conf['username'], conf['pwd'], conf['host'], conf['port'], conf['service_name']
+        db_conf['username'], db_conf['pwd'], db_conf['host'], db_conf['port'], db_conf['service_name']
     )
 
     # Выбор всех данных для тренировочной выборки

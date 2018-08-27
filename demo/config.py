@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
-Конфигурация, доступная всем файлам
+Считывание файла настроек
 """
 
 import configparser
 
 config = configparser.ConfigParser()
-config.read('sys_config.ini', encoding='UTF8')
+config.read('sys_config.ini', encoding='utf-8')
